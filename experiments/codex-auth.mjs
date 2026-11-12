@@ -82,8 +82,11 @@ function appServer(name, seed) {
       notifications.push(value);
       if (value.method === 'account/chatgptAuthTokens/refresh' && value.id !== undefined) {
         hostRefreshRequests.push({ method: value.method, params: value.params });
+        // Codex can ask the host before any model HTTP request. Keep the initial token
+        // until the local fixture has actually rejected it, then supply a new one.
+        const alreadyRejected = requests.some(r => r.path.includes('/responses') && r.authorization === `Bearer ${newToken}`);
         child.stdin.write(JSON.stringify({ id: value.id, result: {
-          accessToken: externallyRefreshedToken, chatgptAccountId: account, chatgptPlanType: 'plus',
+          accessToken: alreadyRejected ? externallyRefreshedToken : newToken, chatgptAccountId: account, chatgptPlanType: 'plus',
         } }) + '\n');
       }
     }
@@ -179,6 +182,14 @@ try {
   await external.waitFor(value => value.method === 'turn/completed');
   assert(external.hostRefreshRequests.length >= 1, '401 must invoke host refresh callback');
   const modelRequests = requests.filter(r => r.path.includes('/responses'));
+  console.log(JSON.stringify({
+    observation: 'external-auth-request-sequence',
+    callbacks: external.hostRefreshRequests,
+    requests: requests.map(r => ({ method: r.method, path: r.path,
+      token: r.authorization === `Bearer ${newToken}` ? 'initial' : r.authorization === `Bearer ${externallyRefreshedToken}` ? 'host-refreshed' : 'other-or-none',
+    })),
+    turn: external.notifications.find(n => n.method === 'turn/completed')?.params?.turn,
+  }));
   assert(modelRequests.some(r => r.authorization === `Bearer ${newToken}`));
   assert(modelRequests.some(r => r.authorization === `Bearer ${externallyRefreshedToken}`), 'Original request should retry with host-supplied new access token');
   assert.equal(requests.filter(r => r.path === '/oauth/token').length, count, 'External host recovery must not refresh a native refresh token');
