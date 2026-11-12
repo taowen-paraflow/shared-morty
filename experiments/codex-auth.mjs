@@ -1,0 +1,163 @@
+// Run the real pinned Codex binary against a localhost OAuth fixture, never a real account.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import http from 'node:http';
+import readline from 'node:readline';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+
+const base = fs.mkdtempSync(path.join(os.tmpdir(), 'sm-codex-protocol-'));
+const account = 'account-synthetic-fixture';
+const jwt = marker => [
+  Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url'),
+  Buffer.from(JSON.stringify({
+    sub: 'user-synthetic-fixture', email: 'fixture@example.invalid',
+    exp: Math.floor(Date.now() / 1000) + 3600, marker,
+    'https://api.openai.com/auth': { chatgpt_account_id: account, chatgpt_plan_type: 'plus' },
+  })).toString('base64url'),
+  'synthetic-signature',
+].join('.');
+const oldToken = jwt('old'), newToken = jwt('rotated');
+const requests = [];
+const server = http.createServer(async (request, response) => {
+  let body = '';
+  for await (const chunk of request) body += chunk;
+  requests.push({ method: request.method, path: request.url, body });
+  response.setHeader('content-type', 'application/json');
+  if (request.url === '/oauth/token') {
+    const payload = JSON.parse(body);
+    assert.equal(payload.grant_type, 'refresh_token');
+    assert.equal(payload.refresh_token, 'synthetic-refresh-old');
+    response.end(JSON.stringify({
+      access_token: newToken, id_token: newToken, refresh_token: 'synthetic-refresh-new',
+      expires_in: 3600, token_type: 'Bearer',
+    }));
+  } else {
+    response.statusCode = 404;
+    response.end(JSON.stringify({ error: { message: 'Local fixture does not implement this endpoint' } }));
+  }
+});
+server.listen(0, '127.0.0.1');
+await once(server, 'listening');
+const origin = `http://127.0.0.1:${server.address().port}`;
+
+function appServer(name) {
+  const home = path.join(base, name);
+  const codexHome = path.join(home, '.codex');
+  fs.mkdirSync(codexHome, { recursive: true });
+  fs.writeFileSync(path.join(codexHome, 'config.toml'), [
+    'cli_auth_credentials_store = "file"',
+    `chatgpt_base_url = "${origin}/backend-api"`,
+  ].join('\n'));
+  const pending = new Map();
+  const notifications = [];
+  let stderr = '', nextId = 0;
+  const child = spawn('codex', ['app-server'], {
+    env: {
+      PATH: process.env.PATH, HOME: home, CODEX_HOME: codexHome,
+      CODEX_REFRESH_TOKEN_URL_OVERRIDE: `${origin}/oauth/token`,
+      RUST_LOG: 'error',
+    },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  child.stderr.on('data', data => { stderr = (stderr + data.toString()).slice(-16_000); });
+  const lines = readline.createInterface({ input: child.stdout });
+  lines.on('line', line => {
+    let value;
+    try { value = JSON.parse(line); } catch { return; }
+    if (value.method) notifications.push(value);
+    else if (pending.has(value.id)) {
+      const waiter = pending.get(value.id);
+      pending.delete(value.id);
+      clearTimeout(waiter.timer);
+      if (value.error) waiter.reject(new Error(JSON.stringify(value.error)));
+      else waiter.resolve(value.result);
+    }
+  });
+  child.on('exit', (code, signal) => {
+    for (const waiter of pending.values()) {
+      clearTimeout(waiter.timer);
+      waiter.reject(new Error(`Codex exited: ${code}/${signal}; ${stderr}`));
+    }
+    pending.clear();
+  });
+  const rpc = (method, params) => new Promise((resolve, reject) => {
+    const id = ++nextId;
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      reject(new Error(`${method} timed out; ${stderr}`));
+    }, 30_000);
+    pending.set(id, { resolve, reject, timer });
+    child.stdin.write(JSON.stringify({ id, method, params }) + '\n');
+  });
+  const initialize = async () => {
+    await rpc('initialize', {
+      clientInfo: { name: 'shared_morty_fixture', version: '0.0.1' },
+      capabilities: { experimentalApi: true },
+    });
+    child.stdin.write(JSON.stringify({ method: 'initialized' }) + '\n');
+  };
+  const stop = async () => {
+    if (child.exitCode !== null) return;
+    const exited = once(child, 'exit');
+    child.stdin.end();
+    const timer = setTimeout(() => child.kill('SIGKILL'), 5_000);
+    try { await exited; } finally { clearTimeout(timer); lines.close(); }
+  };
+  return { home, codexHome, rpc, initialize, stop, notifications };
+}
+
+const results = [];
+const managed = appServer('managed');
+// app-server loads auth at startup; seed before it can finish initialization.
+fs.writeFileSync(path.join(managed.codexHome, 'auth.json'), JSON.stringify({
+  auth_mode: 'chatgpt',
+  tokens: { id_token: oldToken, access_token: oldToken, refresh_token: 'synthetic-refresh-old', account_id: account },
+  last_refresh: new Date().toISOString(),
+}), { mode: 0o600 });
+let external;
+try {
+  await managed.initialize();
+  const before = await managed.rpc('account/read', { refreshToken: false });
+  assert.equal(before.account?.type, 'chatgpt');
+  const countBefore = requests.filter(r => r.path === '/oauth/token').length;
+  const refreshed = await managed.rpc('account/read', { refreshToken: true });
+  assert.equal(refreshed.account?.type, 'chatgpt');
+  await managed.stop();
+  const updated = JSON.parse(fs.readFileSync(path.join(managed.codexHome, 'auth.json')));
+  const refreshCalls = requests.filter(r => r.path === '/oauth/token').length - countBefore;
+  assert.equal(refreshCalls, 1, 'account/read refreshToken:true must issue a refresh');
+  assert.equal(updated.tokens.access_token, newToken);
+  assert.equal(updated.tokens.refresh_token, 'synthetic-refresh-new');
+  results.push({ test: 'managed-auth-read-forces-refresh-and-persists', passed: true, refreshCalls, persistedAfterProcessExit: true });
+
+  external = appServer('external');
+  await external.initialize();
+  await external.rpc('account/login/start', {
+    type: 'chatgptAuthTokens', accessToken: newToken, chatgptAccountId: account, chatgptPlanType: 'plus',
+  });
+  const count = requests.filter(r => r.path === '/oauth/token').length;
+  const externalAccount = await external.rpc('account/read', { refreshToken: true });
+  assert.equal(externalAccount.account?.type, 'chatgpt');
+  assert.equal(requests.filter(r => r.path === '/oauth/token').length, count, 'External mode must not use the managed refresh endpoint');
+  await external.stop();
+  const externalAuthFile = path.join(external.codexHome, 'auth.json');
+  const persisted = fs.existsSync(externalAuthFile) ? fs.readFileSync(externalAuthFile, 'utf8') : '';
+  assert(!persisted.includes('synthetic-refresh'));
+  results.push({ test: 'external-auth-accepts-access-token-without-refresh-token', passed: true, nativeRefreshCalls: 0, authFileExists: fs.existsSync(externalAuthFile) });
+
+  const output = {
+    codexVersion: '0.154.0', results,
+    endpoint: 'localhost-only OAuth fixture',
+    limitations: 'Real binary and file writes, synthetic OAuth server. Does not prove real account acceptance, multi-user OAuth policy, 401 refresh callback, or Morty integration.',
+  };
+  console.log(JSON.stringify(output, null, 2));
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Real Codex protocol fixture\n\n\`\`\`json\n${JSON.stringify(output, null, 2)}\n\`\`\`\n`);
+} finally {
+  await managed.stop();
+  if (external) await external.stop();
+  server.closeAllConnections();
+  server.close();
+}
