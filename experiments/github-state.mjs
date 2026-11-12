@@ -63,7 +63,7 @@ async function writeFile(name, body, sha, allowed = []) {
 async function createLock(contender) {
   const { value: base } = await api('GET', `${root}/git/ref/heads/${branch}`);
   const { value: commit } = await api('GET', `${root}/git/commits/${base.object.sha}`);
-  const owner = { runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT, contender, nonce: crypto.randomUUID() };
+  const owner = { runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT, jobName: process.env.GITHUB_JOB, contender, nonce: crypto.randomUUID() };
   const { value: own } = await api('POST', `${root}/git/commits`, {
     message: JSON.stringify(owner), tree: commit.tree.sha, parents: [base.object.sha],
   });
@@ -144,6 +144,37 @@ if (command === 'initialize') {
     refreshCount: latest.body.refreshCount,
     refusesRefreshingAsReady: true,
     limitation: 'The crash marker is injected; this does not validate a real process kill or OAuth server rotation.',
+  });
+} else if (command === 'crash') {
+  const own = await createLock('real-exit-after-intent');
+  assert(own);
+  const previous = await readFile();
+  await writeFile('codex.enc', { kind: 'refreshing', revision: 4, operationId: own.owner.nonce, refreshCount: 1 }, previous.sha);
+  summary('intentional-process-crash', { leavesLock: true, leavesRefreshingMarker: true, expectedExitCode: 23 });
+  process.exit(23);
+} else if (command === 'recover-crash') {
+  const { value: ref } = await api('GET', `${root}/git/ref/heads/${lock}`);
+  const { value: commit } = await api('GET', `${root}/git/commits/${ref.object.sha}`);
+  const owner = JSON.parse(commit.message);
+  assert.equal(owner.contender, 'real-exit-after-intent');
+  const { value: jobs } = await api('GET', `${root}/actions/runs/${process.env.GITHUB_RUN_ID}/jobs?per_page=100`);
+  const oldJob = jobs.jobs.find(job => job.name === owner.jobName);
+  assert(oldJob, 'Must identify the exact old job');
+  assert.equal(oldJob.status, 'completed', 'Never recover a lock from a running job');
+  const previous = await readFile();
+  assert.equal(previous.body.kind, 'refreshing');
+  assert.equal(previous.body.revision, 4);
+  assert.equal(previous.body.refreshCount, 1);
+  await releaseLock({ sha: ref.object.sha });
+  const own = await createLock('recovery-owner');
+  assert(own);
+  const check = await readFile();
+  await writeFile('codex.enc', { kind: 'reauth_required', revision: 5, reason: 'uncertain-provider-outcome', refreshCount: 1 }, check.sha);
+  await releaseLock(own);
+  summary('cross-job-real-crash-recovery', {
+    previousJob: oldJob.name, previousJobStatus: oldJob.status,
+    persistedMarker: previous.body.kind, finalState: 'reauth_required',
+    repeatedRefreshes: 0, realProcessExit: true,
   });
 } else if (command === 'slot') {
   const start = Date.now();

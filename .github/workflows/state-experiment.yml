@@ -57,6 +57,32 @@ jobs:
           node-version: '24'
       - run: node experiments/github-state.mjs verify
 
+  crash-after-intent:
+    needs: verify-lock-and-recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: crash
+        continue-on-error: true
+        run: node experiments/github-state.mjs crash
+      - name: Check intentional crash happened
+        env:
+          CRASH_OUTCOME: ${{ steps.crash.outcome }}
+        run: test "$CRASH_OUTCOME" = failure
+
+  recover-after-crash:
+    needs: crash-after-intent
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: node experiments/github-state.mjs recover-crash
+
   user-slots:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -152,7 +178,7 @@ jobs:
 
   cleanup:
     if: always()
-    needs: [verify-lock-and-recovery, verify-user-slots, cache-restore, codex-real-binary]
+    needs: [recover-after-crash, verify-user-slots, cache-restore, codex-real-binary]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
