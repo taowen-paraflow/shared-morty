@@ -59,6 +59,13 @@ function appServer(name, seed) {
   fs.writeFileSync(path.join(codexHome, 'config.toml'), [
     'cli_auth_credentials_store = "file"',
     `chatgpt_base_url = "${origin}/backend-api"`,
+    'model_provider = "local_fixture"',
+    '[model_providers.local_fixture]',
+    'name = "Local fixture"',
+    `base_url = "${origin}/v1"`,
+    'wire_api = "responses"',
+    'requires_openai_auth = true',
+    'supports_websockets = false',
   ].join('\n'));
   if (seed) fs.writeFileSync(path.join(codexHome, 'auth.json'), JSON.stringify(seed), { mode: 0o600 });
   const pending = new Map();

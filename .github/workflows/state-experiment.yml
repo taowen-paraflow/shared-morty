@@ -174,7 +174,10 @@ jobs:
         with:
           node-version: '24'
       - run: npm install --global @openai/codex@0.154.0
-      - run: node experiments/codex-auth.mjs
+      - name: Test real Codex with loopback-only network
+        run: |
+          sudo env PATH="$PATH" GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" \
+            unshare --net sh -c 'ip link set lo up; exec node experiments/codex-auth.mjs'
 
   cleanup:
     if: always()
