@@ -36,7 +36,6 @@ test.each([
                     GITHUB_RUN_ID: "501",
                     GITHUB_REF: ref,
                     SHARED_CLAUDE_AVAILABLE: "true",
-                    SHARED_CODEX_AVAILABLE: "false",
                     SHARED_MORTY_DIAGNOSTICS: "1",
                 },
                 timeout: 10_000,
@@ -48,7 +47,6 @@ test.each([
                     userId: "42",
                     requestId,
                     claude: "configured",
-                    codex: "missing",
                     chat: "not_implemented",
                 });
                 expect(result.stdout + result.stderr).not.toContain("fixture-token");

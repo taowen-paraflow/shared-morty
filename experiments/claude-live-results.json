@@ -67,7 +67,7 @@
         "issueClosedAt": "2026-11-13T03:23:20Z"
     },
     "limitations": [
-        "No real model turn, history encryption, or Codex sharing is tested here.",
+        "No real model turn or history encryption is tested here.",
         "Only one authenticated GitHub actor participated; two-member concurrent use is not established.",
         "The synthetic provider-error branch and decorative success wrapping are not literal captures of real failure/success frames; the success parser markers, token shape, and masking are empirically confirmed."
     ],

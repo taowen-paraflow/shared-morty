@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { fireEvent, getByLabelText, getByRole, queryByRole } from "@testing-library/dom";
+import { fireEvent, getByLabelText, getByRole, queryByRole, within } from "@testing-library/dom";
 import { expect, test } from "vitest";
 import { mountLauncher } from "../src/launcher/app.tsx";
 import { githubServer } from "./support/github-server.ts";
@@ -7,7 +7,7 @@ import { launcherClock } from "./support/launcher-clock.ts";
 import { visibleStatus } from "./support/launcher-ui.ts";
 import { loginGitHubServer } from "./support/login-github.ts";
 
-test("Given a team member, when she chooses each feature, then usage, Claude sharing, and Codex sharing have separate controls", async () => {
+test("Given a team member, when she chooses each feature, then only Claude usage and sharing have separate controls", async () => {
     const github = await loginGitHubServer();
     const root = document.createElement("main");
     document.body.append(root);
@@ -20,10 +20,10 @@ test("Given a team member, when she chooses each feature, then usage, Claude sha
         await visibleStatus(root, "当前没有运行中的 runner");
         expect(getByRole(root, "heading", { name: "个人 Claude 环境" })).toBeDefined();
         expect(queryByRole(root, "button", { name: "开始 Claude 授权" })).toBeNull();
-        fireEvent.click(getByRole(root, "button", { name: "共享 Codex" }));
-        await visibleStatus(root, "Codex 账号共享尚未实现");
-        expect(queryByRole(root, "button", { name: "检查运行环境" })).toBeNull();
-        expect(queryByRole(root, "button", { name: "开始 Claude 授权" })).toBeNull();
+        expect(within(getByRole(root, "navigation", { name: "功能" })).getAllByRole("button")).toHaveLength(
+            2,
+        );
+        expect(root.textContent).not.toContain("Codex");
         fireEvent.click(getByRole(root, "button", { name: "共享 Claude Code" }));
         await visibleStatus(root, "为团队提供你自己的 Claude Code 账号");
         expect(getByRole(root, "button", { name: "开始 Claude 授权" })).toBeDefined();

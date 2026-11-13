@@ -104,8 +104,8 @@ test.each(["ready", "agent_failure", "morty_failure", "unsafe_link"])(
                 const workspace = new URL(link).searchParams.get("workspace");
                 expect(link).toContain("https://morty.build/continue");
                 expect(github.messages()).not.toContain("synthetic-private-morty-transfer");
-                fireEvent.click(getByRole(root, "button", { name: "共享 Codex" }));
-                await visibleStatus(root, "Codex 账号共享尚未实现");
+                fireEvent.click(getByRole(root, "button", { name: "共享 Claude Code" }));
+                await visibleStatus(root, "为团队提供你自己的 Claude Code 账号");
                 expect(queryByRole(root, "link", { name: "打开聊天" })).toBeNull();
                 fireEvent.click(getByRole(root, "button", { name: "使用团队账号" }));
                 await visibleStatus(root, "环境已就绪");

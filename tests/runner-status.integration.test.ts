@@ -31,7 +31,7 @@ test("Given authenticated Alice and mixed runs, when she inspects status, then o
             actorId: 42,
             name: "shared-morty-42-r-experiment",
             status: "in_progress",
-            path: ".github/workflows/state-experiment.yml",
+            path: ".github/workflows/unrelated.yml",
         },
     ]);
     try {

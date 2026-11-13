@@ -36,7 +36,6 @@ await runCommand(async (signal) => {
         userId,
         requestId: parsed.output.inputs.request_id,
         claude: process.env.SHARED_CLAUDE_AVAILABLE === "true" ? "configured" : "missing",
-        codex: process.env.SHARED_CODEX_AVAILABLE === "true" ? "configured" : "missing",
         chat: "not_implemented",
     };
 });

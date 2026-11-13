@@ -4,7 +4,7 @@ import { type LauncherOptions, type Session, useConnection } from "./connection.
 import { ConnectionForm } from "./connection-form.tsx";
 import { UsagePage } from "./usage-page.tsx";
 
-type Page = "use" | "share_claude" | "share_codex";
+type Page = "use" | "share_claude";
 function Workspace({
     session,
     lifetime,
@@ -32,23 +32,9 @@ function Workspace({
                 >
                     共享 Claude Code
                 </button>
-                <button
-                    type="button"
-                    aria-current={page === "share_codex" ? "page" : undefined}
-                    onClick={() => setPage("share_codex")}
-                >
-                    共享 Codex
-                </button>
             </nav>
             <UsagePage session={session} lifetime={lifetime} hidden={page !== "use"} options={options} />
             <ClaudeSharingPage session={session} lifetime={lifetime} hidden={page !== "share_claude"} />
-            {page === "share_codex" && (
-                <section role="status" aria-live="polite">
-                    <h2>共享我的 Codex 账号</h2>
-                    <p>Codex 账号共享尚未实现。</p>
-                    <p>此功能用于为团队提供自己的 Codex 账号。使用团队已有账号请前往“使用团队账号”。</p>
-                </section>
-            )}
         </>
     );
 }
@@ -65,7 +51,7 @@ export function Launcher({
             <header>
                 <p className="eyebrow">SHARED MORTY</p>
                 <h1>团队账号，独立对话。</h1>
-                <p>使用团队账号，或为团队共享你自己的 Claude Code / Codex 账号。</p>
+                <p>使用团队账号，或为团队共享你自己的 Claude Code 账号。</p>
             </header>
             <details open={state.kind !== "connected"}>
                 <summary>

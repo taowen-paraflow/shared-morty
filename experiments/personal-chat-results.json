@@ -149,7 +149,7 @@
             "Same-origin reload verified in real Chromium; browser process restart and cross-browser persistence were not tested.",
             "The authenticated run used built assets on loopback with one-use GitHub CLI bootstrap; public deployment is verified separately.",
             "A different real actor had an overlapping run; no control of their conversation or two-member data-isolation test was performed.",
-            "No archive/history persistence, Codex, or shared credential rotation was tested."
+            "No archive/history persistence or shared credential rotation was tested."
         ]
     }
 }

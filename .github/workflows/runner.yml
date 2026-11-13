@@ -37,4 +37,3 @@ jobs:
               env:
                   GH_TOKEN: ${{ github.token }}
                   SHARED_CLAUDE_AVAILABLE: ${{ secrets.SHARED_CLAUDE_TOKEN != '' }}
-                  SHARED_CODEX_AVAILABLE: ${{ secrets.SHARED_AUTH_KEY != '' }}

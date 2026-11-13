@@ -210,7 +210,7 @@ export function EnvironmentPanel({ state, act, retry, repository, now }: Props) 
                         </button>
                     </>
                 )}
-                <p>Codex 聊天和个人历史保存尚未实现。</p>
+                <p>个人历史保存尚未实现。</p>
             </details>
         </>
     );
