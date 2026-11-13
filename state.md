@@ -35,7 +35,7 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 
 登录进程只传 PATH、临时 home 路径、终端类型、`BROWSER=false`、关闭更新与非必要流量的标记给 Claude；不传成员 PAT、job token、其他 Secrets 或个人密钥。90 秒内必须看到授权入口；整个交换期限从浏览器创建请求起算 15 分钟，包含排队。取消和超时会停止子进程，并有界尝试发送加密错误和关闭 Issue。取消 API 的成功仅表示请求被接收；页面仍需确认任务结束。请求或授权码发送结果不确定时保留本页上下文等待刷新，不自动重发。
 
-当前验证：真实 HTTP 替身、实际加密与 Secret 解密、外部进程替身；官方固定版本只检查了命令入口。已在公开仓库完成真实浏览器到 runner 的 challenge / code 密文往返；首次真实授权因官方 CLI 遮罩输入与旧 fake 不同，在发送 Enter 前失败，尚未验证 token 返回和 Secrets 写入。后续合成输入探测及修正见 `experiments/claude-live-results.json`。此前浏览器额外检查被拒绝不再代替这次实际观察；未完成的项目仍不记为通过。此协议是新增 v1，尚无已发布的旧消息对端；原有检查 CLI 输出及保存格式未变。
+当前验证：真实 HTTP 替身、实际加密与 Secret 解密、外部进程替身；官方固定版本只检查了命令入口。已在公开仓库完成真实浏览器到 runner 的 challenge / code 密文往返；首次真实授权因官方 CLI 遮罩输入与旧 fake 不同，在发送 Enter 前失败；合成探测定位后，修正后的真实运行 43358458456 成功确认遮罩输入、发送 Enter、返回 108 字符 token 密文并关闭 Issue。真实浏览器完成解密和 LibSodium Secret 发布，GitHub 元数据确认 `SHARED_CLAUDE_TOKEN` 于 2026-11-13 03:24:30 UTC 创建。另一台 VM 的运行 43359580808 读取新 Secret，官方 `claude auth status` 确认 `loggedIn=true` / `oauth_token`；没有发起模型对话，也不代表完成多人并发验证。观察、修正和公开日志扫描结果见 `experiments/claude-live-results.json`。此前浏览器额外检查被拒绝不再代替这次实际观察；未完成的项目仍不记为通过。此协议是新增 v1，尚无已发布的旧消息对端；原有检查 CLI 输出及保存格式未变。
 
 页面尚不读取环境检查的完整输出，详情在 Actions 查看；Claude 登录状态从加密 Issue 消息读取。以下 Codex 认证、聊天和归档流程仍是待实现设计，Claude 登录部分以本节的实际读写为准。
 
