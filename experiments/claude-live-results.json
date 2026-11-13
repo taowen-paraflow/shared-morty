@@ -36,7 +36,16 @@
         "prompt": "Paste code here if prompted > ",
         "authorizationOrigin": "https://claude.com",
         "authorizationPath": "/cai/oauth/authorize",
-        "queryKeys": ["client_id", "code", "code_challenge", "code_challenge_method", "redirect_uri", "response_type", "scope", "state"]
+        "queryKeys": [
+            "client_id",
+            "code",
+            "code_challenge",
+            "code_challenge_method",
+            "redirect_uri",
+            "response_type",
+            "scope",
+            "state"
+        ]
     },
     "regression": {
         "fixtureChange": "Use the observed prompt, synthetic OAuth parameter structure, and stars plus the final six input characters.",
@@ -44,10 +53,58 @@
         "afterFix": "The existing worker acceptance scenarios pass and record masked echo mode without logging its suffix."
     },
     "retryAuthorization": {
-        "outcome": "pending"
+        "runId": 43358458456,
+        "sourceSha": "43e172de2e2a3d568fdea05e3aefd437c4d6259c",
+        "issue": 2,
+        "outcome": "success",
+        "inputCharacters": 92,
+        "inputEchoMode": "masked",
+        "enterSent": true,
+        "tokenCharacters": 108,
+        "tokenHeaderObserved": true,
+        "tokenAdviceObserved": true,
+        "encryptedTokenReturned": true,
+        "issueClosedAt": "2026-11-13T03:23:20Z"
     },
     "limitations": [
         "No real model turn, history encryption, or Codex sharing is tested here.",
-        "The synthetic provider failure and token-success fixture branches remain provisional until compared with subsequent live observations."
-    ]
+        "Only one authenticated GitHub actor participated; two-member concurrent use is not established.",
+        "The synthetic provider-error branch and decorative success wrapping are not literal captures of real failure/success frames; the success parser markers, token shape, and masking are empirically confirmed."
+    ],
+    "secretPublication": {
+        "name": "SHARED_CLAUDE_TOKEN",
+        "createdAt": "2026-11-13T03:24:30Z",
+        "updatedAt": "2026-11-13T03:24:30Z",
+        "browserDisplayedSuccess": true,
+        "repositoryMetadataConfirmed": true,
+        "secretValueReadBack": false
+    },
+    "publicLogAudit": {
+        "runId": 43358458456,
+        "logBytes": 40429,
+        "patternsDetected": {
+            "token": false,
+            "oauthUrl": false,
+            "oauthCode": false,
+            "pkceQuery": false
+        },
+        "issueCommentPatternsDetected": {
+            "token": false,
+            "oauthUrl": false,
+            "oauthCode": false,
+            "pkceQuery": false
+        },
+        "commentCount": 3,
+        "allCommentsValidatedAsEncryptedEnvelopes": true,
+        "limitation": "Pattern scanning supplements typed logging and encryption; it is not a proof against every possible disclosure."
+    },
+    "browserEvidence": {
+        "runtime": "Codex in-app Chromium browser",
+        "webCryptoRoundTrip": true,
+        "libSodiumSecretPublication": true,
+        "csp": "Built launcher policy plus self connection only for the temporary local bootstrap endpoint."
+    },
+    "sharedSecretConsumer": {
+        "outcome": "pending"
+    }
 }

@@ -1,4 +1,5 @@
-const token = `sk-ant-oat01-${"fixture-token-".repeat(4)}`;
+import { authorizationCode, authorizationPrompt, syntheticToken as token } from "./claude-transcript.ts";
+
 if (process.env.GH_TOKEN || process.env.UNRELATED_SECRET || process.env.CLAUDE_CODE_OAUTH_TOKEN) {
     process.stderr.write("OAuth error: unexpected inherited credentials\n");
     process.exit(1);
@@ -22,15 +23,14 @@ process.stdin.on("data", (chunk) => {
         return;
     }
     process.stdout.write("\r\n");
-    if (input.trim() !== "fixture-good-code#fixture-state") {
+    if (input.trim() !== authorizationCode) {
         process.stdout.write("OAuth error: Invalid code\r\n");
         process.exitCode = 1;
     } else {
+        // Retain hard wrapping as a robustness case; cosmetic success text was not captured.
         process.stdout.write(
-            `Your OAuth token (valid for 1 year):\r\n${token.slice(0, 35)}\r\n${token.slice(35)}\r\nStore this token securely.\r\n`,
+            `\u001b[2J\u001b[HOAuth token (valid for 1 year):\r\n${token.slice(0, 35)}\r\n${token.slice(35)}\r\nStore this token\r\n`,
         );
     }
     process.stdin.pause();
 });
-
-import { authorizationPrompt } from "./claude-transcript.ts";
