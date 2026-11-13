@@ -21,13 +21,13 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 | --- | --- | --- | --- |
 | 浏览器连接状态与 Session：PAT HTTP client、规范仓库名、GitHub 身份、连接代号 | `connection.ts` 的 `useConnection`；身份与仓库经 GitHub schema 校验 | 页面连接摘要；三个独立功能读取当前 Session | 内存；输入框立即清空。重连取消旧请求并卸载旧功能；连接代号只用于本地组件生命周期，不作为身份依据 |
 | 当前入口：使用 / 共享 Claude / 共享 Codex | `view.tsx` 的 Workspace，由本人导航操作更新 | 导航与对应页面 | 默认使用入口；切换不提交 workflow、不发布凭据；重新连接重置 |
-| 使用页任务快照：loading / ready / stale / working / failed | `usage-page.tsx`，只接收本人运行查询与操作结果 | 使用页及 `RunnerPanel` | 没有本页聊天任务时，进入或返回使用页重新查询；切换只隐藏以保留聊天密钥。stale 禁止凭旧快照启动检查 |
-| 浏览器个人聊天状态：idle / waiting / ready / stopping / stopped / failed，另有 working 包裹前态 | `use-chat.ts` 调用 `launcher/personal-chat.ts`；只接受经 schema、bot id、真实 run / attempt 核验并成功解密的结果 | `ChatPanel`，不被共享账号页读取 | 仅内存；切换入口保留；重新连接、刷新或关闭后丢失。状态查询失败会撤下旧链接，保留本次密钥供重试 |
+| 使用页任务快照：loading / ready / stale / working / failed | `use-runner.ts`，只接收本人运行查询与操作结果；`usage-page.tsx` 协调显示 | 使用页及 `RunnerPanel` | 没有本页聊天任务时，进入或返回使用页重新查询；切换只隐藏以保留聊天密钥。stale 禁止凭旧快照启动检查 |
+| 浏览器个人聊天状态：idle / waiting / ready / stopping / stopped / failed，另有 working 包裹前态 | `use-chat.ts` 调用 `launcher/personal-chat.ts`；后者把经 schema、bot id、真实 run / attempt 核验并成功解密的消息归为单一结果联合，失败优先于停止、停止优先于就绪 | `ChatPanel`，不被共享账号页读取 | 仅内存；切换入口保留；重新连接、刷新或关闭后丢失。状态查询失败会撤下旧链接，保留本次密钥供重试 |
 | Claude 共享页：intro / login / working；login 内为授权协议阶段 | `claude-sharing-page.tsx` 调用登录领域函数写入 | `ClaudeLoginPanel` | 切换入口只隐藏，不卸载，保留授权上下文；失败保留可重试结果；共享或取消后返回本功能设置。使用页不读取此状态 |
 | Codex 共享页 | 当前无业务状态 | 独立说明页 | 尚未实现，不启动授权或读取 Secrets |
 | 浏览器各功能当前请求的 AbortController | `useTask` 按功能独立持有；连接请求由 `useConnection` 持有 | 对应 GitHub / 登录异步操作 | 同一功能同步阻止重复提交；卸载、重连、页面销毁时取消，已取消响应不能写回。切换入口不会取消保留中的 Claude 登录或个人聊天交换；不代表取消已提交的远端任务 |
 | workflow dispatch inputs：检查任务的 `mode=check` / `request_id`；登录及聊天任务的 `issue` / `request_id` | launcher | GitHub、对应运行进程 | 不携带凭据、授权码或私钥；提交成功不等于任务已启动 |
-| Actions `GITHUB_EVENT_PATH` 指向的事件 JSON | GitHub | 检查、登录或聊天入口 | 本次 job 临时文件；校验 schema，再用 job token 核对真实 run |
+| Actions `GITHUB_EVENT_PATH` 指向的事件 JSON | GitHub | 检查入口；登录 / 聊天通过 `issue-execution.ts` 的 `readIssueExecution` 读取 | 本次 job 临时文件；公共解析只返回 readonly IssueExecution，不授予执行权限；领域入口仍用 job token 核对真实 run |
 | job 环境中的 `GH_TOKEN` | GitHub 注入 job token | 运行进程的 GitHub HTTP client | 检查任务 contents / actions read；登录、聊天任务另有 issues write。均不传给 Claude 子进程，不授予 Secrets 写入 |
 | `SHARED_CLAUDE_AVAILABLE` / `SHARED_CODEX_AVAILABLE` | workflow 根据 Secret 是否为空计算字符串布尔值 | 检查进程 | 只传存在标记，不传 Secret 内容；不进行登录或认证有效性验证 |
 | `SHARED_MORTY_DIAGNOSTICS=1` 的结构化诊断日志 | 登录进程 / HTTP client / PTY 适配器 | Actions 日志读者（公开仓库中包括任何人） | 仅固定事件、资源类别、状态码、长度、run / attempt / Issue id、聊天生命周期与白名单提示标记；没有原始 URL、输入、终端文本或 token |
