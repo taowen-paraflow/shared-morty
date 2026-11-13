@@ -71,7 +71,7 @@ export async function beginPersonalChat(
             notice: `${publicError(cause).message} 提交结果未确认，正在自动核对，请勿重复启动。`,
         };
     }
-    return { kind: "waiting", context, stage: "queued", notice: "个人 Claude 正在启动。" };
+    return { kind: "waiting", context, stage: "queued", notice: "任务已提交，正在等待运行。" };
 }
 
 type ChatOutcome =
@@ -196,7 +196,9 @@ export async function refreshPersonalChat(
                 return execution.conclusion === "success" || execution.conclusion === "cancelled"
                     ? { kind: "stopped", notice: "个人环境已结束，可以重新开始。" }
                     : { kind: "failed", notice: "环境准备未完成，请查看运行详情后重试。" };
-            return { ...state, stage: execution.status === "in_progress" ? "preparing" : "queued" };
+            return execution.status === "in_progress"
+                ? { ...state, stage: "preparing", notice: "正在准备个人环境并连接 Claude。" }
+                : { ...state, stage: "queued", notice: "任务已提交，正在等待运行。" };
         }
     }
     return state;

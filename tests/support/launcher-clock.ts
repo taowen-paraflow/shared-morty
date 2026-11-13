@@ -1,10 +1,11 @@
 import { AppError } from "../../src/shared/errors.ts";
 
 export function launcherClock() {
+    let currentTime = Date.parse("2026-11-13T00:00:00Z");
     const waiting = new Set<{ readonly milliseconds: number; readonly finish: () => void }>();
     let scheduled: (() => void) | undefined;
     return {
-        now: Date.now,
+        now: () => currentTime,
         wait: (milliseconds: number, signal: AbortSignal) =>
             new Promise<void>((resolve, reject) => {
                 if (signal.aborted) {
@@ -34,6 +35,7 @@ export function launcherClock() {
                 });
                 scheduled = undefined;
             }
+            currentTime += milliseconds;
             for (const entry of [...waiting]) if (entry.milliseconds === milliseconds) entry.finish();
         },
     };

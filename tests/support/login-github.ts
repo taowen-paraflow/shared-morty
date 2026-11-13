@@ -45,6 +45,7 @@ export async function loginGitHubServer(
     let runConclusion = "success";
     let authenticationAllowed = true;
     let userId = 42;
+    let dispatchUncertain = false;
     const events = new EventEmitter();
     const comments: {
         readonly id: number;
@@ -165,7 +166,7 @@ export async function loginGitHubServer(
                     throw new Error("Dispatch mismatch");
                 runStarted = true;
                 runCreated = true;
-                response.writeHead(204).end();
+                response.writeHead(dispatchUncertain ? 503 : 204).end();
                 return;
             }
             if (url.pathname.endsWith("/issues") && request.method === "POST") {
@@ -258,6 +259,9 @@ export async function loginGitHubServer(
         authorizationUrl,
         authorizationCode,
         token,
+        loseDispatchResponse: () => {
+            dispatchUncertain = true;
+        },
         authenticateAs: (id: number) => {
             userId = id;
         },

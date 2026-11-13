@@ -106,5 +106,50 @@
         "Fresh temporary sessions only: no history encryption/archive/restore or cross-device continuation provided by shared-morty.",
         "Morty relay and model infrastructure process plaintext; pattern scans supplement typed logging and do not prove universal confidentiality.",
         "Force cancellation may skip cleanup; one-hour startup deadline includes queue time. Morty browser-native state is separate from launcher state."
-    ]
+    ],
+    "refreshRecovery": {
+        "runId": 43376282942,
+        "issue": 6,
+        "sourceSha": "4b75b4817374ce99258d79be431e2ddf303095cf",
+        "workflowConclusion": "success",
+        "issueState": "closed",
+        "automaticReadyWithoutManualRefresh": true,
+        "fullPageReloadRestoredGitHubConnection": true,
+        "fullPageReloadRecoveredSameChatEntry": true,
+        "browserNativeNonextractableKeySurvivedReload": true,
+        "modelReplyAfterRecoveryMatched": true,
+        "normalStopRequested": true,
+        "pageReloadAfterStopSubmission": true,
+        "terminalStateRecoveredWithoutReadyLink": true,
+        "mortyOfflineObserved": true,
+        "cleanupStageObserved": true,
+        "commentKinds": [
+            "ready",
+            "stop",
+            "stopped"
+        ],
+        "logPatternsDetected": {
+            "claudeToken": false,
+            "mortyTransfer": false,
+            "oauthCode": false,
+            "pkceQuery": false,
+            "syntheticChatText": false
+        },
+        "commentPatternsDetected": {
+            "claudeToken": false,
+            "mortyTransfer": false,
+            "oauthCode": false,
+            "pkceQuery": false,
+            "syntheticChatText": false
+        },
+        "concurrentOtherActorRunId": 43373788316,
+        "otherActorTaskLeftUntouched": true,
+        "authenticatedTestOrigin": "http://127.0.0.1:4173",
+        "limitations": [
+            "Same-origin reload verified in real Chromium; browser process restart and cross-browser persistence were not tested.",
+            "The authenticated run used built assets on loopback with one-use GitHub CLI bootstrap; public deployment is verified separately.",
+            "A different real actor had an overlapping run; no control of their conversation or two-member data-isolation test was performed.",
+            "No archive/history persistence, Codex, or shared credential rotation was tested."
+        ]
+    }
 }

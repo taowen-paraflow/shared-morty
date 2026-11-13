@@ -34,6 +34,7 @@ test.each(["failure", "cancelled"])(
         vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(new Date("2026-11-13T00:00:00Z"));
         const github = await loginGitHubServer({ workflow: "chat" });
+        github.loseDispatchResponse();
         const clock = launcherClock();
         const root = document.createElement("main");
         document.body.append(root);
@@ -44,7 +45,7 @@ test.each(["failure", "cancelled"])(
             fireEvent.click(getByRole(root, "button", { name: "连接 GitHub" }));
             await visibleStatus(root, "开始你的 Claude 会话");
             fireEvent.click(getByRole(root, "button", { name: "开始聊天" }));
-            await visibleStatus(root, "正在准备你的 Claude 环境");
+            await visibleStatus(root, "提交结果未确认");
             unmount();
             unmount = mountLauncher(root, { apiOrigin: github.origin, clock });
             await visibleStatus(root, "正在准备你的 Claude 环境");

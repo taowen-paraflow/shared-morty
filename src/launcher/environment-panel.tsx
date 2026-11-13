@@ -63,8 +63,7 @@ export function EnvironmentPanel({ state, act, retry, repository, now }: Props) 
         description = "你的个人 Claude 已连接，可以开始聊天。";
     } else if (starting) {
         title = "正在准备你的 Claude 环境";
-        description =
-            chat.stage === "queued" ? "任务已提交，正在等待运行。" : "正在准备个人环境并连接 Claude。";
+        description = chat.notice;
     } else if (snapshot?.kind === "available" && snapshot.inspection.runner.kind !== "idle") {
         title = "你已有一个运行任务";
         description = "请先结束现有任务。运行详情中可以查看并处理它。";
