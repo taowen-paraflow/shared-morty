@@ -30,12 +30,12 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 | 本次 Issue 正文 | launcher | 登录进程 | 协议 v1、本人 id、request id、浏览器公钥、15 分钟 expiresAt；不含凭据 |
 | 本次 Issue comments | launcher 写授权码密文；job bot 写 challenge / token / error 密文 | 本次双方 | RSA-OAEP-SHA256 包装 AES-256-GCM key；AAD 绑定仓库、Issue、request、run、attempt、消息类型与期限。网页验证 bot 稳定 id，runner 验证真实用户 id；拒绝重复 code 和混合 attempt |
 | 登录目录 `$RUNNER_TEMP/shared-morty-claude-login-<随机后缀>/` | 运行进程创建，Claude 写自己的临时配置 | 仅本次登录子进程 | 同时作为 cwd / HOME / USERPROFILE / TMPDIR / TEMP，不载入个人聊天；子进程退出后运行进程递归删除。VM 强制销毁时依赖平台清理 |
-| PTY 和 xterm 内存屏幕 | 官方 Claude CLI 输出，运行进程读取 | 登录适配器 | `script` 日志目标为 `/dev/null`，stdout / stderr 不转发到 Actions 日志；等待授权码在屏幕回显后才发送 Enter；不按任意日志文本提取凭据 |
+| PTY 和 xterm 内存屏幕 | 官方 Claude CLI 输出，运行进程读取 | 登录适配器 | `script` 日志目标为 `/dev/null`，stdout / stderr 不转发到 Actions 日志；等待授权码明文或“星号遮罩 + 末尾六字符”在屏幕确认后才发送 Enter；不按任意日志文本提取凭据 |
 | 仓库 Secret `SHARED_CLAUDE_TOKEN` | 本人 launcher 在显式点击共享后通过 PUT 写入或替换 | 后续 Claude 任务由 GitHub 注入 | 传输使用 GitHub 公钥 sealed box；只有 HTTP 201 / 204 成功才显示共享成功，权限或网络失败保留本页 token 供重试 |
 
 登录进程只传 PATH、临时 home 路径、终端类型、`BROWSER=false`、关闭更新与非必要流量的标记给 Claude；不传成员 PAT、job token、其他 Secrets 或个人密钥。90 秒内必须看到授权入口；整个交换期限从浏览器创建请求起算 15 分钟，包含排队。取消和超时会停止子进程，并有界尝试发送加密错误和关闭 Issue。取消 API 的成功仅表示请求被接收；页面仍需确认任务结束。请求或授权码发送结果不确定时保留本页上下文等待刷新，不自动重发。
 
-当前验证：真实 HTTP 替身、实际加密与 Secret 解密、外部进程替身；官方固定版本只检查了命令入口。尚未验证真实 Claude 账号授权、真实 Secrets 首次写入或浏览器 CSP。浏览器额外检查被工具自动审批拒绝，不能记为通过。此协议是新增 v1，尚无已发布的旧消息对端；原有检查 CLI 输出及保存格式未变。
+当前验证：真实 HTTP 替身、实际加密与 Secret 解密、外部进程替身；官方固定版本只检查了命令入口。已在公开仓库完成真实浏览器到 runner 的 challenge / code 密文往返；首次真实授权因官方 CLI 遮罩输入与旧 fake 不同，在发送 Enter 前失败，尚未验证 token 返回和 Secrets 写入。后续合成输入探测及修正见 `experiments/claude-live-results.json`。此前浏览器额外检查被拒绝不再代替这次实际观察；未完成的项目仍不记为通过。此协议是新增 v1，尚无已发布的旧消息对端；原有检查 CLI 输出及保存格式未变。
 
 页面尚不读取环境检查的完整输出，详情在 Actions 查看；Claude 登录状态从加密 Issue 消息读取。以下 Codex 认证、聊天和归档流程仍是待实现设计，Claude 登录部分以本节的实际读写为准。
 
