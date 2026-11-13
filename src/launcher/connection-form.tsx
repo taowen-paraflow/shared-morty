@@ -105,7 +105,10 @@ export function ConnectionForm({ onConnect }: { readonly onConnect: (input: Conn
                             required
                         />
                     </label>
-                    <p className="hint">Token 只保留在本页内存，输入框连接时清空；刷新页面后需重新连接。</p>
+                    <p className="hint">
+                        连接后，Token
+                        加密保存在此浏览器，刷新可自动恢复。请使用自己的浏览器；清除此网站数据会移除连接和环境恢复密钥。
+                    </p>
                     <button type="submit" disabled={guide.kind === "invalid"}>
                         连接 GitHub
                     </button>

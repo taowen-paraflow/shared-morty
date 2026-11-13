@@ -21,7 +21,7 @@ test("Given a first-time visitor, when she opens the launcher, then the token gu
         expect(url.searchParams.get("issues")).toBe("write");
         expect(url.searchParams.has("secrets")).toBe(false);
         expect(getByText(root, /Only select repositories/)).toBeDefined();
-        expect(getByText(root, /刷新页面后需重新连接/)).toBeDefined();
+        expect(getByText(root, /刷新可自动恢复/)).toBeDefined();
     } finally {
         unmount();
         root.remove();

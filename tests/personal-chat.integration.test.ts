@@ -2,7 +2,7 @@
 
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
-import { fireEvent, getByLabelText, getByRole, queryByRole } from "@testing-library/dom";
+import { findByRole, fireEvent, getByLabelText, getByRole, queryByRole } from "@testing-library/dom";
 import * as v from "valibot";
 import { expect, test, vi } from "vitest";
 import { mountLauncher } from "../src/launcher/app.tsx";
@@ -12,6 +12,7 @@ import type { Diagnostic } from "../src/shared/diagnostics.ts";
 import { AppError } from "../src/shared/errors.ts";
 import { GitHubClient } from "../src/shared/github.ts";
 import { parseJson } from "../src/shared/login-protocol.ts";
+import { launcherClock } from "./support/launcher-clock.ts";
 import { visibleStatus } from "./support/launcher-ui.ts";
 import { loginGitHubServer } from "./support/login-github.ts";
 
@@ -24,7 +25,8 @@ test.each(["ready", "agent_failure", "morty_failure", "unsafe_link"])(
         const lifetime = new AbortController();
         const root = document.createElement("main");
         document.body.append(root);
-        const unmount = mountLauncher(root, { apiOrigin: github.origin });
+        const clock = launcherClock();
+        let unmount = mountLauncher(root, { apiOrigin: github.origin, clock });
         const previousSecret = process.env.UNRELATED_SECRET;
         process.env.UNRELATED_SECRET = "must-not-reach-personal-agent";
         const diagnostics: Diagnostic[] = [];
@@ -39,8 +41,8 @@ test.each(["ready", "agent_failure", "morty_failure", "unsafe_link"])(
             fireEvent.input(getByLabelText(root, "GitHub Token"), { target: { value: "fixture-token" } });
             fireEvent.click(getByRole(root, "button", { name: "连接 GitHub" }));
             await visibleStatus(root, "当前没有运行中的 runner");
-            fireEvent.click(getByRole(root, "button", { name: "启动我的 Claude 聊天" }));
-            await visibleStatus(root, "个人 Claude 正在启动");
+            fireEvent.click(getByRole(root, "button", { name: "开始聊天" }));
+            await visibleStatus(root, "正在准备你的 Claude 环境");
             const response = await fetch(`${github.origin}/repos/team/execution/issues/601`, {
                 headers: { authorization: "Bearer fixture-token" },
             });
@@ -95,35 +97,41 @@ test.each(["ready", "agent_failure", "morty_failure", "unsafe_link"])(
             if (outcome === "ready") {
                 await github.waitForMessage("ready");
                 await waiting;
-                fireEvent.click(getByRole(root, "button", { name: "刷新聊天状态" }));
-                await visibleStatus(root, "个人 Claude 聊天已就绪");
-                const link = getByRole(root, "link", { name: "打开我的 Morty 聊天" }).getAttribute("href");
+                await clock.tick(5_000);
+                await visibleStatus(root, "环境已就绪");
+                const link = getByRole(root, "link", { name: "打开聊天" }).getAttribute("href");
                 if (!link) throw new Error("Missing private handoff");
                 const workspace = new URL(link).searchParams.get("workspace");
                 expect(link).toContain("https://morty.build/continue");
                 expect(github.messages()).not.toContain("synthetic-private-morty-transfer");
                 fireEvent.click(getByRole(root, "button", { name: "共享 Codex" }));
                 await visibleStatus(root, "Codex 账号共享尚未实现");
-                expect(queryByRole(root, "link", { name: "打开我的 Morty 聊天" })).toBeNull();
+                expect(queryByRole(root, "link", { name: "打开聊天" })).toBeNull();
                 fireEvent.click(getByRole(root, "button", { name: "使用团队账号" }));
-                await visibleStatus(root, "个人 Claude 聊天已就绪");
-                expect(getByRole(root, "link", { name: "打开我的 Morty 聊天" }).getAttribute("href")).toBe(
-                    link,
-                );
-                fireEvent.click(getByRole(root, "button", { name: "停止我的聊天（不保存）" }));
+                await visibleStatus(root, "环境已就绪");
+                expect(getByRole(root, "link", { name: "打开聊天" }).getAttribute("href")).toBe(link);
+                unmount();
+                unmount = mountLauncher(root, { apiOrigin: github.origin, clock });
+                await visibleStatus(root, "环境已就绪");
+                expect(getByRole(root, "link", { name: "打开聊天" }).getAttribute("href")).toBe(link);
+                fireEvent.click(getByRole(root, "button", { name: "结束环境" }));
+                fireEvent.click(await findByRole(root, "button", { name: "确认结束" }));
                 await visibleStatus(root, "停止请求已提交");
-                expect(queryByRole(root, "link", { name: "打开我的 Morty 聊天" })).toBeNull();
+                unmount();
+                unmount = mountLauncher(root, { apiOrigin: github.origin, clock });
+                await visibleStatus(root, "正在结束环境");
+                expect(queryByRole(root, "link", { name: "打开聊天" })).toBeNull();
                 tick?.();
                 await finished;
                 github.finishRun();
                 if (!workspace) throw new Error("Missing workspace");
                 await expect(stat(workspace)).rejects.toMatchObject({ code: "ENOENT" });
-                fireEvent.click(getByRole(root, "button", { name: "刷新聊天状态" }));
+                await clock.tick(5_000);
                 await visibleStatus(root, "个人聊天已停止");
             } else {
                 await finished;
                 github.finishRun();
-                fireEvent.click(getByRole(root, "button", { name: "刷新聊天状态" }));
+                await clock.tick(5_000);
                 await visibleStatus(
                     root,
                     outcome === "agent_failure"
@@ -132,7 +140,7 @@ test.each(["ready", "agent_failure", "morty_failure", "unsafe_link"])(
                           ? "Morty 暂时无法连接"
                           : "GitHub 返回了无法验证的数据",
                 );
-                expect(queryByRole(root, "link", { name: "打开我的 Morty 聊天" })).toBeNull();
+                expect(queryByRole(root, "link", { name: "打开聊天" })).toBeNull();
             }
             expect(github.messages()).not.toContain(github.token);
             expect(JSON.stringify(diagnostics)).not.toContain(github.token);

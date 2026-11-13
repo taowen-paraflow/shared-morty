@@ -48,10 +48,13 @@ export class GitHubClient {
         return { repository: name, user };
     };
 
-    readonly inspectRunner = async (repository: string, signal: AbortSignal): Promise<RunnerInspection> => {
+    async #ownedRuns(repository: string, signal: AbortSignal) {
         const name = repositoryName(repository);
         const user = await this.#user(signal);
-        const runs = new Map<number, ActiveRun>();
+        const runs = new Map<
+            number,
+            Readonly<v.InferOutput<typeof githubRunsSchema>["workflow_runs"][number]>
+        >();
         for (let page = 1; page <= MAX_PAGES; page++) {
             const query = new URLSearchParams({
                 actor: user.login,
@@ -72,20 +75,58 @@ export class GitHubClient {
                     run.display_title.startsWith(`shared-morty-${user.id}-`) &&
                     (workflow === ".github/workflows/runner.yml" ||
                         workflow === ".github/workflows/login.yml" ||
-                        workflow === ".github/workflows/chat.yml") &&
-                    run.status !== "completed"
+                        workflow === ".github/workflows/chat.yml")
                 ) {
-                    runs.set(run.id, {
-                        id: run.id,
-                        status: run.status,
-                        url: `https://github.com/${name}/actions/runs/${run.id}`,
-                    });
+                    runs.set(run.id, run);
                 }
             }
-            if (page * 100 >= parsed.output.total_count)
-                return { user, runner: runnerState([...runs.values()]) };
+            if (page * 100 >= parsed.output.total_count) return { user, runs: [...runs.values()] };
         }
         throw new AppError("too_many_runs");
+    }
+
+    readonly inspectRunner = async (repository: string, signal: AbortSignal): Promise<RunnerInspection> => {
+        const name = repositoryName(repository);
+        const { user, runs } = await this.#ownedRuns(name, signal);
+        const active: ActiveRun[] = runs
+            .filter((run) => run.status !== "completed")
+            .map((run) => ({
+                id: run.id,
+                status: run.status,
+                url: `https://github.com/${name}/actions/runs/${run.id}`,
+            }));
+        return { user, runner: runnerState(active) };
+    };
+
+    readonly findChatExecution = async (
+        repository: string,
+        requestId: string,
+        userId: string,
+        signal: AbortSignal,
+    ) => {
+        const name = repositoryName(repository);
+        const { user, runs } = await this.#ownedRuns(name, signal);
+        if (user.id !== userId) throw new AppError("forbidden");
+        const matches = runs.filter(
+            (run) =>
+                run.path.split("@")[0] === ".github/workflows/chat.yml" &&
+                run.display_title === `shared-morty-${user.id}-${requestId}`,
+        );
+        if (matches.length > 1) throw new AppError("unsafe_execution");
+        const run = matches[0];
+        return run
+            ? ({
+                  kind: "found",
+                  status: run.status,
+                  conclusion: run.conclusion ?? null,
+                  id: run.id,
+              } satisfies {
+                  readonly kind: "found";
+                  readonly status: string;
+                  readonly conclusion: string | null;
+                  readonly id: number;
+              })
+            : ({ kind: "missing" } satisfies { readonly kind: "missing" });
     };
 
     readonly checkEnvironment = async (repository: string, signal: AbortSignal): Promise<void> => {

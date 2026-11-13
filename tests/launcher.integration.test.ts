@@ -72,12 +72,12 @@ test("Given Alice has no runner, when she checks the execution environment and c
         fireEvent.click(getByRole(root, "button", { name: "检查运行环境" }));
         await visible(root, "检查任务已提交");
         expect(queryByRole(root, "button", { name: "检查运行环境" })).toBeNull();
-        fireEvent.click(getByRole(root, "button", { name: "刷新状态" }));
+        fireEvent.click(getByRole(root, "button", { name: "重新检查" }));
         await visible(root, "等待运行");
         expect(queryByRole(root, "button", { name: "检查运行环境" })).toBeNull();
         fireEvent.click(getByRole(root, "button", { name: "强制停止（不保存）" }));
         await visible(root, "停止请求已提交");
-        fireEvent.click(getByRole(root, "button", { name: "刷新状态" }));
+        fireEvent.click(getByRole(root, "button", { name: "重新检查" }));
         await visible(root, "当前没有运行中的 runner");
         expect(root.textContent).not.toContain("fixture-token");
     } finally {
@@ -98,10 +98,10 @@ test("Given an idle snapshot, when refreshing fails authentication, then startin
         fireEvent.click(getByRole(root, "button", { name: "连接 GitHub" }));
         await visible(root, "当前没有运行中的 runner");
         github.rejectAuthentication();
-        fireEvent.click(getByRole(root, "button", { name: "刷新状态" }));
+        fireEvent.click(getByRole(root, "button", { name: "重新检查" }));
         await visible(root, "GitHub Token 无效或已过期。");
         expect(queryByRole(root, "button", { name: "检查运行环境" })).toBeNull();
-        expect(getByRole(root, "button", { name: "刷新状态" })).toBeDefined();
+        expect(getByRole(root, "button", { name: "立即重试" })).toBeDefined();
         expect(root.textContent).not.toContain("fixture-token");
     } finally {
         unmount();

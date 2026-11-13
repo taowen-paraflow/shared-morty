@@ -3,6 +3,7 @@ import { fireEvent, getByLabelText, getByRole, queryByRole } from "@testing-libr
 import { expect, test } from "vitest";
 import { mountLauncher } from "../src/launcher/app.tsx";
 import { githubServer } from "./support/github-server.ts";
+import { launcherClock } from "./support/launcher-clock.ts";
 import { visibleStatus } from "./support/launcher-ui.ts";
 import { loginGitHubServer } from "./support/login-github.ts";
 
@@ -10,13 +11,14 @@ test("Given a team member, when she chooses each feature, then usage, Claude sha
     const github = await loginGitHubServer();
     const root = document.createElement("main");
     document.body.append(root);
-    const unmount = mountLauncher(root, { apiOrigin: github.origin });
+    const clock = launcherClock();
+    const unmount = mountLauncher(root, { apiOrigin: github.origin, clock });
     try {
         fireEvent.input(getByLabelText(root, "执行仓库"), { target: { value: "team/execution" } });
         fireEvent.input(getByLabelText(root, "GitHub Token"), { target: { value: "fixture-token" } });
         fireEvent.click(getByRole(root, "button", { name: "连接 GitHub" }));
         await visibleStatus(root, "当前没有运行中的 runner");
-        expect(getByRole(root, "heading", { name: "使用团队共享账号" })).toBeDefined();
+        expect(getByRole(root, "heading", { name: "个人 Claude 环境" })).toBeDefined();
         expect(queryByRole(root, "button", { name: "开始 Claude 授权" })).toBeNull();
         fireEvent.click(getByRole(root, "button", { name: "共享 Codex" }));
         await visibleStatus(root, "Codex 账号共享尚未实现");
@@ -38,7 +40,8 @@ test("Given a pending Claude authorization, when the owner visits usage and retu
     const github = await loginGitHubServer();
     const root = document.createElement("main");
     document.body.append(root);
-    const unmount = mountLauncher(root, { apiOrigin: github.origin });
+    const clock = launcherClock();
+    const unmount = mountLauncher(root, { apiOrigin: github.origin, clock });
     try {
         fireEvent.input(getByLabelText(root, "执行仓库"), { target: { value: "team/execution" } });
         fireEvent.input(getByLabelText(root, "GitHub Token"), { target: { value: "fixture-token" } });
@@ -52,6 +55,7 @@ test("Given a pending Claude authorization, when the owner visits usage and retu
         fireEvent.click(getByRole(root, "button", { name: "刷新登录状态" }));
         await visibleStatus(root, "在官方页面登录");
         fireEvent.click(getByRole(root, "button", { name: "使用团队账号" }));
+        await clock.tick(30_000);
         await visibleStatus(root, "正在运行");
         expect(queryByRole(root, "button", { name: "提交授权码" })).toBeNull();
         expect(queryByRole(root, "link", { name: "打开 Claude 官方授权页面" })).toBeNull();
@@ -79,7 +83,8 @@ test("Given a running environment check, when the owner starts Claude sharing fr
     const github = await githubServer();
     const root = document.createElement("main");
     document.body.append(root);
-    const unmount = mountLauncher(root, { apiOrigin: github.origin });
+    const clock = launcherClock();
+    const unmount = mountLauncher(root, { apiOrigin: github.origin, clock });
     try {
         fireEvent.input(getByLabelText(root, "执行仓库"), { target: { value: "team/execution" } });
         fireEvent.input(getByLabelText(root, "GitHub Token"), { target: { value: "fixture-token" } });

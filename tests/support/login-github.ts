@@ -41,6 +41,10 @@ export async function loginGitHubServer(
     let sharingAllowed = true;
     let savedToken: string | null = null;
     let runStarted = false;
+    let runCreated = false;
+    let runConclusion = "success";
+    let authenticationAllowed = true;
+    let userId = 42;
     const events = new EventEmitter();
     const comments: {
         readonly id: number;
@@ -64,7 +68,7 @@ export async function loginGitHubServer(
         const send = (value: unknown) => response.end(JSON.stringify(value));
         try {
             if (
-                request.headers.authorization !== "Bearer fixture-token" &&
+                (!authenticationAllowed || request.headers.authorization !== "Bearer fixture-token") &&
                 request.headers.authorization !== "Bearer runner-token"
             ) {
                 response.writeHead(401);
@@ -72,7 +76,7 @@ export async function loginGitHubServer(
                 return;
             }
             if (url.pathname === "/user") {
-                send({ id: 42, login: "alice" });
+                send({ id: userId, login: userId === 42 ? "alice" : "bob" });
                 return;
             }
             if (url.pathname === "/repos/team/execution") {
@@ -128,14 +132,15 @@ export async function loginGitHubServer(
             if (url.pathname.endsWith("/actions/runs")) {
                 const parsed = requestBody ? v.parse(loginRequestSchema, parseJson(requestBody)) : null;
                 send({
-                    total_count: runStarted ? 1 : 0,
+                    total_count: runCreated ? 1 : 0,
                     workflow_runs:
-                        runStarted && parsed
+                        runCreated && parsed
                             ? [
                                   {
                                       id: 701,
                                       actor: { id: 42 },
-                                      status: "in_progress",
+                                      status: runStarted ? "in_progress" : "completed",
+                                      conclusion: runStarted ? null : runConclusion,
                                       path: `.github/workflows/${workflow}.yml`,
                                       display_title: `shared-morty-42-${parsed.requestId}`,
                                   },
@@ -159,6 +164,7 @@ export async function loginGitHubServer(
                 if (parsed.inputs.request_id !== channel.requestId || parsed.inputs.issue !== "601")
                     throw new Error("Dispatch mismatch");
                 runStarted = true;
+                runCreated = true;
                 response.writeHead(204).end();
                 return;
             }
@@ -252,6 +258,12 @@ export async function loginGitHubServer(
         authorizationUrl,
         authorizationCode,
         token,
+        authenticateAs: (id: number) => {
+            userId = id;
+        },
+        allowAuthentication: (allowed: boolean) => {
+            authenticationAllowed = allowed;
+        },
         publishChallenge: (
             options: {
                 readonly authorId?: number;
@@ -287,7 +299,8 @@ export async function loginGitHubServer(
             sharingAllowed = true;
         },
         sharedToken: () => savedToken,
-        finishRun: () => {
+        finishRun: (conclusion = "success") => {
+            runConclusion = conclusion;
             runStarted = false;
         },
         messages: () => JSON.stringify({ requestBody, comments }),

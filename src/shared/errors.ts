@@ -1,4 +1,5 @@
 export type ErrorCode =
+    | "storage_unavailable"
     | "agent_failed"
     | "shared_credential_missing"
     | "morty_unavailable"
@@ -18,6 +19,7 @@ export type ErrorCode =
     | "timeout";
 
 const messages: Readonly<Record<ErrorCode, string>> = {
+    storage_unavailable: "无法保存浏览器恢复信息，请允许此网站使用本地存储后重试。",
     agent_failed: "Claude 未能启动，请查看运行状态；若共享登录态失效，请账号提供者重新共享。",
     shared_credential_missing: "此仓库尚未共享 Claude 账号，请账号提供者先完成共享。",
     morty_unavailable: "Morty 暂时无法连接，请停止此任务后重试。",

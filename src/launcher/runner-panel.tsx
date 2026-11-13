@@ -1,5 +1,5 @@
 import { assertNever, type RunnerState } from "../shared/runner-status.ts";
-import type { RunnerAction } from "./use-runner.ts";
+export type RunnerAction = { readonly kind: "check" } | { readonly kind: "cancel"; readonly runId: number };
 
 const runLabels: Readonly<Record<string, string>> = {
     in_progress: "你的 runner 正在运行。",

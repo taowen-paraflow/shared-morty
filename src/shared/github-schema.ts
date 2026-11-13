@@ -13,6 +13,7 @@ export const githubRunsSchema = v.object({
                 id: identifier,
                 display_title: v.pipe(v.string(), v.maxLength(512)),
                 status: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
+                conclusion: v.optional(v.nullable(v.string())),
                 path: v.pipe(v.string(), v.maxLength(512)),
                 actor: v.nullable(v.object({ id: identifier })),
             }),

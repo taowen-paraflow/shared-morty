@@ -16,6 +16,7 @@ const bootstrap = `
 const root = document.querySelector('main');
 async function connect() {
   const response = await fetch('/live-auth', {cache:'no-store', credentials:'same-origin'});
+  if (response.status === 403) return;
   if (!response.ok) throw new Error('Local GitHub bootstrap failed');
   const data = await response.json();
   if (!data || typeof data.token !== 'string' || typeof data.repository !== 'string') throw new Error('Invalid bootstrap');

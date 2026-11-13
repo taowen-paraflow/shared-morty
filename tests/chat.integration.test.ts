@@ -15,7 +15,7 @@ test("Given a connected team member, when she chooses team Claude, then a person
         fireEvent.input(getByLabelText(root, "GitHub Token"), { target: { value: "fixture-token" } });
         fireEvent.click(getByRole(root, "button", { name: "连接 GitHub" }));
         await visibleStatus(root, "当前没有运行中的 runner");
-        expect(getByRole(root, "button", { name: "启动我的 Claude 聊天" })).toBeDefined();
+        expect(getByRole(root, "button", { name: "开始聊天" })).toBeDefined();
     } finally {
         unmount();
         root.remove();

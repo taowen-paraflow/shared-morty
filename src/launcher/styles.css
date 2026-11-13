@@ -155,3 +155,70 @@ section button {
     margin-top: 16px;
     font-size: 14px;
 }
+.environment-card {
+    background: #fff;
+    border: 1px solid #c8d2c5;
+    border-radius: 16px;
+    padding: 24px;
+}
+.environment-label {
+    color: #526661;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    margin: 0;
+}
+.environment-card h3 {
+    font-size: 24px;
+    margin: 12px 0;
+}
+.environment-note {
+    color: #526661;
+    font-size: 14px;
+}
+.environment-progress {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 28px;
+    padding-left: 22px;
+    font-size: 14px;
+}
+.environment-progress [aria-current="step"] {
+    color: #225c49;
+    font-weight: 700;
+}
+button.secondary {
+    background: #eef2ed;
+    color: #225c49;
+    border: 1px solid #9aac9c;
+}
+button.text-action {
+    background: transparent;
+    color: #526661;
+    text-decoration: underline;
+    padding: 10px 0;
+}
+button.danger {
+    background: #923c32;
+    color: #fff;
+}
+.end-confirmation {
+    border-left: 3px solid #923c32;
+    padding-left: 16px;
+    margin-top: 20px;
+}
+.environment-details {
+    margin-top: 20px;
+    color: #526661;
+    font-size: 14px;
+}
+.attention {
+    color: #804e14;
+}
+@media (max-width: 480px) {
+    main {
+        padding: 20px;
+    }
+    .environment-card {
+        padding: 20px;
+    }
+}

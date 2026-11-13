@@ -5,7 +5,15 @@ import { ConnectionForm } from "./connection-form.tsx";
 import { UsagePage } from "./usage-page.tsx";
 
 type Page = "use" | "share_claude" | "share_codex";
-function Workspace({ session, lifetime }: { readonly session: Session; readonly lifetime: AbortSignal }) {
+function Workspace({
+    session,
+    lifetime,
+    options,
+}: {
+    readonly session: Session;
+    readonly lifetime: AbortSignal;
+    readonly options: LauncherOptions;
+}) {
     const [page, setPage] = useState<Page>("use");
     return (
         <>
@@ -32,7 +40,7 @@ function Workspace({ session, lifetime }: { readonly session: Session; readonly 
                     共享 Codex
                 </button>
             </nav>
-            <UsagePage session={session} lifetime={lifetime} hidden={page !== "use"} />
+            <UsagePage session={session} lifetime={lifetime} hidden={page !== "use"} options={options} />
             <ClaudeSharingPage session={session} lifetime={lifetime} hidden={page !== "share_claude"} />
             {page === "share_codex" && (
                 <section role="status" aria-live="polite">
@@ -67,20 +75,31 @@ export function Launcher({
                 </summary>
                 <p>
                     {state.kind === "connected"
-                        ? "重新连接会清除本页尚未共享的授权结果和聊天入口，不会自动停止已运行的任务。"
+                        ? "连接与个人环境恢复信息保存在此浏览器；刷新后会重新核验身份并恢复入口。更换账号不会停止现有任务。"
                         : "用你自己的 GitHub 身份启动个人环境，首次连接按下面 3 步完成。"}
                 </p>
                 <ConnectionForm onConnect={connect} />
             </details>
             {state.kind === "connected" ? (
-                <Workspace key={state.session.id} session={state.session} lifetime={lifetime} />
+                <Workspace
+                    key={state.session.id}
+                    session={state.session}
+                    lifetime={lifetime}
+                    options={options}
+                />
             ) : (
-                <section role="status" aria-live="polite" aria-busy={state.kind === "connecting"}>
-                    {state.kind === "disconnected"
-                        ? "尚未连接 GitHub。"
-                        : state.kind === "connecting"
-                          ? "正在确认 GitHub 身份与仓库…"
-                          : state.error.message}
+                <section
+                    role="status"
+                    aria-live="polite"
+                    aria-busy={state.kind === "connecting" || state.kind === "restoring"}
+                >
+                    {state.kind === "restoring"
+                        ? "正在恢复 GitHub 连接…"
+                        : state.kind === "disconnected"
+                          ? "尚未连接 GitHub。"
+                          : state.kind === "connecting"
+                            ? "正在确认 GitHub 身份与仓库…"
+                            : state.error.message}
                 </section>
             )}
         </>

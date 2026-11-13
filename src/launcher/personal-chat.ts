@@ -14,15 +14,21 @@ import type { GitHubClient } from "../shared/github.ts";
 import { createLoginKey, type LoginKey, open } from "../shared/login-crypto.ts";
 import { ACTIONS_BOT_ID, parseJson } from "../shared/login-protocol.ts";
 import { assertNever } from "../shared/runner-status.ts";
+import { rememberChat } from "./browser-vault.ts";
 
-interface ChatContext {
+export interface ChatContext {
     readonly repository: string;
     readonly issue: number;
     readonly request: ChatRequest;
     readonly key: LoginKey;
 }
 export type PersonalChat =
-    | { readonly kind: "waiting"; readonly context: ChatContext; readonly notice: string }
+    | {
+          readonly kind: "waiting";
+          readonly context: ChatContext;
+          readonly stage: "queued" | "preparing";
+          readonly notice: string;
+      }
     | {
           readonly kind: "ready";
           readonly context: ChatContext;
@@ -54,16 +60,18 @@ export async function beginPersonalChat(
     const channel = client.chatChannel(repository);
     const issue = await channel.create(request, signal);
     const context = { repository, issue, request, key };
+    await rememberChat({ version: 1, phase: "waiting", ...context }, signal);
     try {
         await channel.dispatch(request, issue, signal);
     } catch (cause) {
         return {
             kind: "waiting",
             context,
-            notice: `${publicError(cause).message} 提交结果未确认，请刷新聊天状态，不要重复启动。`,
+            stage: "queued",
+            notice: `${publicError(cause).message} 提交结果未确认，正在自动核对，请勿重复启动。`,
         };
     }
-    return { kind: "waiting", context, notice: "个人 Claude 正在启动，请刷新聊天状态。" };
+    return { kind: "waiting", context, stage: "queued", notice: "个人 Claude 正在启动。" };
 }
 
 type ChatOutcome =
@@ -176,6 +184,21 @@ export async function refreshPersonalChat(
             return { kind: "stopped", notice: "个人聊天已结束或访问已到期，请刷新运行状态。" };
         return outcome;
     }
+    if (state.kind === "waiting") {
+        const execution = await client.findChatExecution(
+            context.repository,
+            context.request.requestId,
+            context.request.userId,
+            signal,
+        );
+        if (execution.kind === "found") {
+            if (execution.status === "completed")
+                return execution.conclusion === "success" || execution.conclusion === "cancelled"
+                    ? { kind: "stopped", notice: "个人环境已结束，可以重新开始。" }
+                    : { kind: "failed", notice: "环境准备未完成，请查看运行详情后重试。" };
+            return { ...state, stage: execution.status === "in_progress" ? "preparing" : "queued" };
+        }
+    }
     return state;
 }
 
@@ -210,6 +233,7 @@ export async function stopPersonalChat(
         signal,
     );
     if (attempt === undefined) throw new AppError("unsafe_execution");
+    await rememberChat({ version: 1, phase: "stopping", ...context }, signal);
     if (mode === "force") await client.cancelRunner(context.repository, inspection.runner.run.id, signal);
     else
         await client.chatChannel(context.repository).stop(
@@ -228,6 +252,6 @@ export async function stopPersonalChat(
     return {
         kind: "stopping",
         context,
-        notice: "停止请求已提交，请刷新聊天状态确认结束；本次历史不会保存。",
+        notice: "停止请求已提交，正在等待环境结束。",
     };
 }
