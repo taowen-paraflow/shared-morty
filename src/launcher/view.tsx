@@ -63,9 +63,13 @@ export function Launcher({
                 <summary>
                     {state.kind === "connected"
                         ? `已连接 ${state.session.user.login} · ${state.session.repository}`
-                        : "连接 GitHub"}
+                        : "连接 GitHub（首次使用）"}
                 </summary>
-                <p>GitHub 连接用于确认身份和操作执行仓库。重新连接会清除本页尚未共享的授权结果。</p>
+                <p>
+                    {state.kind === "connected"
+                        ? "重新连接会清除本页尚未共享的授权结果和聊天入口，不会自动停止已运行的任务。"
+                        : "用你自己的 GitHub 身份启动个人环境，首次连接按下面 3 步完成。"}
+                </p>
                 <ConnectionForm onConnect={connect} />
             </details>
             {state.kind === "connected" ? (

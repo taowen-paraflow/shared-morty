@@ -108,3 +108,50 @@ summary {
 section button {
     margin: 4px 8px 4px 0;
 }
+
+.connection-form {
+    display: block;
+    margin-top: 20px;
+    line-height: 1.65;
+}
+.connection-steps {
+    padding-left: 24px;
+}
+.connection-steps > li {
+    padding: 12px 0 24px 8px;
+}
+.connection-steps > li + li {
+    border-top: 1px solid #c8d2c5;
+}
+.connection-steps > li::marker {
+    color: #225c49;
+    font-weight: 700;
+}
+.connection-steps h2 {
+    margin: 0;
+    font-size: 18px;
+}
+.connection-steps p {
+    margin: 12px 0;
+    font-size: 14px;
+}
+.connection-steps .hint {
+    font-size: 12px;
+}
+.button-link {
+    display: inline-block;
+    padding: 12px 18px;
+    border-radius: 8px;
+    background: #225c49;
+    color: white;
+    font-weight: 600;
+    text-decoration: none;
+}
+.button-link:hover {
+    background: #184734;
+}
+.sharing-token-guide,
+.connection-help {
+    margin-top: 16px;
+    font-size: 14px;
+}
