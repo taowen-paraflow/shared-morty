@@ -1,187 +1,91 @@
-import { type AppError, publicError } from "../shared/errors.ts";
+import { publicError } from "../shared/errors.ts";
 import { GitHubClient } from "../shared/github.ts";
-import { assertNever, type RunnerInspection } from "../shared/runner-status.ts";
-
-type LauncherState =
-    | { readonly kind: "disconnected" }
-    | { readonly kind: "connecting"; readonly request: AbortController }
-    | { readonly kind: "connected"; readonly session: Session; readonly message: string }
-    | { readonly kind: "working"; readonly request: AbortController }
-    | { readonly kind: "failed"; readonly error: AppError };
-
-interface Session {
-    readonly client: GitHubClient;
-    readonly repository: string;
-    readonly inspection: RunnerInspection;
-}
+import { assertNever } from "../shared/runner-status.ts";
+import type { ConnectionInput, LauncherAction, LauncherState } from "./state.ts";
+import { createLauncherView } from "./view.ts";
 
 interface LauncherOptions {
     readonly apiOrigin?: string;
 }
 
-const runLabels: Readonly<Record<string, string>> = {
-    in_progress: "你的 runner 正在运行。",
-    queued: "你的 runner 等待运行。",
-    pending: "你的 runner 等待运行。",
-    requested: "你的 runner 等待运行。",
-    waiting: "你的 runner 等待运行。",
-};
-
 export function mountLauncher(root: HTMLElement, options: LauncherOptions = {}): () => void {
-    const document = root.ownerDocument;
-    root.innerHTML = `
-        <header><p class="eyebrow">SHARED MORTY</p><h1>你的环境，你的对话。</h1>
-        <p>连接 GitHub，查看属于你的运行环境。</p></header>
-        <form>
-            <label>执行仓库<input name="repository" placeholder="owner/repository" autocomplete="off" required></label>
-            <label>GitHub Token<input name="token" type="password" autocomplete="off" required></label>
-            <p class="hint">Token 仅用于本次页面连接。</p>
-            <button type="submit">连接 GitHub</button>
-        </form>
-        <section role="status" aria-live="polite"></section>`;
-    const form = root.querySelector("form");
-    const repository = root.querySelector<HTMLInputElement>('input[name="repository"]');
-    const token = root.querySelector<HTMLInputElement>('input[name="token"]');
-    const status = root.querySelector<HTMLElement>('[role="status"]');
-    if (!form || !repository || !token || !status) throw new Error("Launcher markup is incomplete");
     const lifetime = new AbortController();
     let state: LauncherState = { kind: "disconnected" };
 
-    const text = (content: string) => {
-        const paragraph = document.createElement("p");
-        paragraph.textContent = content;
-        status.append(paragraph);
+    const transition = (next: LauncherState) => {
+        state = next;
+        view.render(state);
     };
-    const link = (url: string) => {
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.textContent = "查看我的 runner";
-        anchor.target = "_blank";
-        anchor.rel = "noopener noreferrer";
-        status.append(anchor);
-    };
-    const button = (label: string, action: () => Promise<void>) => {
-        const control = document.createElement("button");
-        control.type = "button";
-        control.textContent = label;
-        control.addEventListener("click", () => {
-            void action();
-        });
-        status.append(control);
-    };
-    const operate = async (session: Session, action: "refresh" | "check" | number) => {
-        if (state.kind !== "connected") return;
+    const operate = async (action: LauncherAction) => {
+        if (state.kind !== "ready" && state.kind !== "needs_refresh") return;
+        if (action.kind === "check" && state.kind !== "ready") return;
+        const session = state.session;
         const request = new AbortController();
         const signal = AbortSignal.any([lifetime.signal, request.signal]);
         transition({ kind: "working", request });
         try {
-            if (action === "refresh") {
-                const inspection = await session.client.inspectRunner(session.repository, signal);
-                if (!signal.aborted)
-                    transition({ kind: "connected", session: { ...session, inspection }, message: "" });
-            } else {
-                if (action === "check") await session.client.checkEnvironment(session.repository, signal);
-                else await session.client.cancelRunner(session.repository, action, signal);
-                if (!signal.aborted)
-                    transition({
-                        kind: "connected",
-                        session,
-                        message:
-                            action === "check"
-                                ? "检查任务已提交，请刷新状态。检查通过不表示聊天已可用。"
-                                : "停止请求已提交，请刷新状态。尚未确认结束，未保存个人数据。",
-                    });
+            switch (action.kind) {
+                case "refresh": {
+                    const inspection = await session.client.inspectRunner(session.repository, signal);
+                    if (!signal.aborted) transition({ kind: "ready", session: { ...session, inspection } });
+                    return;
+                }
+                case "check":
+                    await session.client.checkEnvironment(session.repository, signal);
+                    if (!signal.aborted)
+                        transition({
+                            kind: "needs_refresh",
+                            session,
+                            notice: "检查任务已提交，请刷新状态。检查通过不表示聊天已可用。",
+                        });
+                    return;
+                case "cancel":
+                    await session.client.cancelRunner(session.repository, action.runId, signal);
+                    if (!signal.aborted)
+                        transition({
+                            kind: "needs_refresh",
+                            session,
+                            notice: "停止请求已提交，请刷新状态。尚未确认结束，未保存个人数据。",
+                        });
+                    return;
+                default:
+                    return assertNever(action);
             }
         } catch (cause) {
             if (!signal.aborted)
                 transition({
-                    kind: "connected",
+                    kind: "needs_refresh",
                     session,
-                    message: `${publicError(cause).message} 如已提交任务，请先刷新状态再重试。`,
+                    notice: `${publicError(cause).message} 如已提交任务，请先刷新状态再重试。`,
                 });
         }
     };
-    const render = () => {
-        status.replaceChildren();
-        switch (state.kind) {
-            case "disconnected":
-                text("尚未连接 GitHub。");
-                return;
-            case "connecting":
-                text("正在确认身份与运行状态…");
-                return;
-            case "working":
-                text("正在处理，请稍候…");
-                return;
-            case "failed":
-                text(state.error.message);
-                return;
-            case "connected": {
-                const session = state.session;
-                text(`已连接 ${session.inspection.user.login}`);
-                if (state.message) text(state.message);
-                button("刷新状态", () => operate(session, "refresh"));
-                const runner = session.inspection.runner;
-                switch (runner.kind) {
-                    case "idle":
-                        text("当前没有运行中的 runner。");
-                        if (!state.message) button("检查运行环境", () => operate(session, "check"));
-                        return;
-                    case "active":
-                        text(runLabels[runner.run.status] ?? "你的 runner 状态待确认，请查看 GitHub。");
-                        link(runner.run.url);
-                        button("强制停止（不保存）", () => operate(session, runner.run.id));
-                        return;
-                    case "conflict":
-                        text("发现多个尚未结束的任务，请先在 GitHub 确认并处理重复启动。");
-                        for (const run of runner.runs) {
-                            link(run.url);
-                            button(`强制停止任务 ${run.id}（不保存）`, () => operate(session, run.id));
-                        }
-                        return;
-                    default:
-                        return assertNever(runner);
-                }
-            }
-            default:
-                return assertNever(state);
-        }
-    };
-    const transition = (next: LauncherState) => {
-        state = next;
-        render();
-    };
-    const connect = async () => {
+    const connect = async (input: ConnectionInput) => {
         if (state.kind === "connecting" || state.kind === "working") state.request.abort();
         const request = new AbortController();
-        const secret = token.value;
-        const selectedRepository = repository.value;
-        token.value = "";
         transition({ kind: "connecting", request });
         const signal = AbortSignal.any([lifetime.signal, request.signal]);
         try {
-            const client = new GitHubClient(secret, options.apiOrigin);
-            const inspection = await client.inspectRunner(selectedRepository, signal);
+            const client = new GitHubClient(input.token, options.apiOrigin);
+            const inspection = await client.inspectRunner(input.repository, signal);
             if (!signal.aborted)
-                transition({
-                    kind: "connected",
-                    session: { client, repository: selectedRepository, inspection },
-                    message: "",
-                });
+                transition({ kind: "ready", session: { client, repository: input.repository, inspection } });
         } catch (cause) {
             if (!signal.aborted) transition({ kind: "failed", error: publicError(cause) });
         }
     };
-    const submit = (event: SubmitEvent) => {
-        event.preventDefault();
-        void connect();
-    };
-    form.addEventListener("submit", submit);
-    render();
+    const view = createLauncherView(
+        root,
+        (input) => {
+            void connect(input);
+        },
+        (action) => {
+            void operate(action);
+        },
+    );
+    view.render(state);
     return () => {
         lifetime.abort();
-        form.removeEventListener("submit", submit);
-        token.value = "";
-        root.replaceChildren();
+        view.dispose();
     };
 }

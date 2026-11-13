@@ -29,6 +29,7 @@ test("Given Alice has no runner, when she checks the execution environment and c
         await visible(root, "当前没有运行中的 runner");
         fireEvent.click(getByRole(root, "button", { name: "检查运行环境" }));
         await visible(root, "检查任务已提交");
+        expect(queryByRole(root, "button", { name: "检查运行环境" })).toBeNull();
         fireEvent.click(getByRole(root, "button", { name: "刷新状态" }));
         await visible(root, "等待运行");
         expect(queryByRole(root, "button", { name: "检查运行环境" })).toBeNull();
@@ -36,6 +37,29 @@ test("Given Alice has no runner, when she checks the execution environment and c
         await visible(root, "停止请求已提交");
         fireEvent.click(getByRole(root, "button", { name: "刷新状态" }));
         await visible(root, "当前没有运行中的 runner");
+        expect(root.textContent).not.toContain("fixture-token");
+    } finally {
+        unmount();
+        root.remove();
+        await github.close();
+    }
+});
+
+test("Given an idle snapshot, when refreshing fails authentication, then starting remains blocked until status is verified again", async () => {
+    const github = await githubServer();
+    const root = document.createElement("main");
+    document.body.append(root);
+    const unmount = mountLauncher(root, { apiOrigin: github.origin });
+    try {
+        fireEvent.input(getByLabelText(root, "执行仓库"), { target: { value: "team/execution" } });
+        fireEvent.input(getByLabelText(root, "GitHub Token"), { target: { value: "fixture-token" } });
+        fireEvent.click(getByRole(root, "button", { name: "连接 GitHub" }));
+        await visible(root, "当前没有运行中的 runner");
+        github.rejectAuthentication();
+        fireEvent.click(getByRole(root, "button", { name: "刷新状态" }));
+        await visible(root, "GitHub Token 无效或已过期。");
+        expect(queryByRole(root, "button", { name: "检查运行环境" })).toBeNull();
+        expect(getByRole(root, "button", { name: "刷新状态" })).toBeDefined();
         expect(root.textContent).not.toContain("fixture-token");
     } finally {
         unmount();

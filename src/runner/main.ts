@@ -1,5 +1,6 @@
-import { AppError, publicError } from "../shared/errors.ts";
+import { AppError } from "../shared/errors.ts";
 import { GitHubClient } from "../shared/github.ts";
+import { runCommand } from "./command.ts";
 
 function options(args: readonly string[]) {
     const [command, ...flags] = args;
@@ -26,20 +27,8 @@ function options(args: readonly string[]) {
     return { repository, apiOrigin };
 }
 
-const lifetime = new AbortController();
-const cancel = () => lifetime.abort();
-process.once("SIGINT", cancel);
-process.once("SIGTERM", cancel);
-try {
+await runCommand(async (signal) => {
     const input = options(process.argv.slice(2));
     const client = new GitHubClient(process.env.GH_TOKEN ?? "", input.apiOrigin);
-    const result = await client.inspectRunner(input.repository, lifetime.signal);
-    process.stdout.write(`${JSON.stringify(result)}\n`);
-} catch (cause) {
-    const error = publicError(cause);
-    process.stderr.write(`${JSON.stringify({ error: { code: error.code, message: error.message } })}\n`);
-    process.exitCode = 1;
-} finally {
-    process.removeListener("SIGINT", cancel);
-    process.removeListener("SIGTERM", cancel);
-}
+    return client.inspectRunner(input.repository, signal);
+});
