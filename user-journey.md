@@ -26,10 +26,10 @@ metadata:
 页面首次展开三步连接引导：
 
 1. 确认已预填的执行仓库；团队成员通常无需修改，fork 部署时管理员应配置自己的默认仓库。
-2. 点击“在 GitHub 创建 Token”，新标签页预填资源所有者、90 天期限和 Actions / Issues 的 Read and write 权限。在 GitHub 的 Repository access 选择 Only select repositories，并勾选页面提示的仓库，再点击 Generate token。模板不能代替这一步仓库选择；期限可按组织策略调整。
+2. 如果仓库属于别人的个人账号，点击“创建协作者 Token（classic）”，使用自己的 GitHub 账号，确认 repo scope、选择较短期限后生成 Token；无需 Resource owner。classic 的 repo 权限不能限定单个仓库，会覆盖本人有权访问的公开和私有仓库。本人仓库所有者或组织内部成员可展开对应入口，用 fine-grained Token，只选执行仓库和 Actions / Issues Read and write；共享账号另需 Secrets write。组织外部协作者不适用该 fine-grained 路径。
 3. 复制 GitHub 刚生成的完整 Token，回到第 3 步粘贴并连接。已有 Token 可直接跳到输入框。
 
-只使用团队账号的人不需要 Secrets 权限。“我要共享自己的账号”展开后提供另一条额外申请 Secrets Read and write 的创建链接；它不启动 Claude 授权或自动共享账号。页面还提供资源所有者 / 仓库不可见、组织审批 Pending 和过期 Token 的排查提示。
+只使用团队账号的人不需要 Secrets 权限。fine-grained 路径的“我要共享自己的账号”展开后提供另一条额外申请 Secrets Read and write 的创建链接；它不启动 Claude 授权或自动共享账号。页面还提供资源所有者 / 仓库不可见、组织审批 Pending 和过期 Token 的排查提示。
 
 页面通过 GitHub API 确认本人和目标仓库，成功后连接区收起并显示身份与仓库。Token 输入框立即清空，连接加密保存在此浏览器；刷新后自动重新核验 GitHub 身份并恢复连接。请使用自己的浏览器配置文件；清除此网站数据会丢失连接和环境恢复密钥。连接本身不会启动任务或读取 Secrets。
 
@@ -99,3 +99,5 @@ Claude CI token 失效或 Codex 无法自动刷新时，只提示账号提供者
 当前真实验证已完成两次本人 Claude / Morty 启动：网页发送消息、一次终端工具授权与文件读写、收到回复；修正后的任务正常停止、自动关闭 Issue，Morty 变为离线。正式入口为 [shared-morty](https://taowen-paraflow.github.io/shared-morty/)。页面加载及发布构建一致性已验证；认证后的完整流程使用相同构建的本地测试入口，不能因此声称已验证另一位成员或多人并发。详见 [实验记录](./experiments/personal-chat-results.json)。
 
 2026-11-13 刷新恢复实测：[run 43376282942](https://github.com/taowen-paraflow/shared-morty/actions/runs/43376282942)，源码 4b75b48。真实 Chromium 自动显示就绪；整页刷新后 GitHub 自动重连、原生 CryptoKey 恢复，解密得到同一会话入口；在 Morty 收到合成消息的预期回复。正常停止后刷新确认终态，Actions success、Issue 6 自动关闭、cleaned_up、Morty Offline。公开日志和评论的凭据 / transfer / OAuth code / PKCE / 合成聊天文本定向扫描均未命中。另一真实 actor 的 run 43373788316 同时仍在运行，未被本次控制；这不代表已验证双方聊天数据隔离。认证测试用同一构建的 localhost 一次性 GitHub bootstrap；未测试浏览器进程重启、跨站点迁移、归档或 Codex。记录见 `experiments/personal-chat-results.json` 的 refreshRecovery。
+
+Token 引导修正：GitHub 官方当前不支持 repository / outside collaborator 使用 fine-grained Token。个人账号 taowen-paraflow 的仓库协作者 taowen 应用本人的 classic Token；不能将 taowen-paraflow 强行作为其 fine-grained Resource owner，也不共享所有者的 GitHub Token。taowen 的写权限已由真实 API 确认；真实聊天 run 43376282942 的 actor 也是 taowen。该证据来自现有 classic 凭据，不代表已经验证新 Token 的签发。引导测试只验证链接和可见说明，不模拟 GitHub 发证策略。[Token 限制](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#fine-grained-personal-access-tokens-limitations)；[dispatch 的 classic repo scope 要求](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event)。
