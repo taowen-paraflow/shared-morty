@@ -1,5 +1,5 @@
 import { assertNever, type RunnerState } from "../shared/runner-status.ts";
-import type { LauncherAction } from "./state.ts";
+import type { RunnerAction } from "./usage-page.tsx";
 
 const runLabels: Readonly<Record<string, string>> = {
     in_progress: "你的 runner 正在运行。",
@@ -13,7 +13,7 @@ interface RunnerPanelProps {
     readonly runner: RunnerState;
     readonly snapshot: "verified" | "stale";
     readonly busy: boolean;
-    readonly onAction: (action: LauncherAction) => void;
+    readonly onAction: (action: RunnerAction) => void;
 }
 
 export function RunnerPanel({ runner, snapshot, busy, onAction }: RunnerPanelProps) {
@@ -23,18 +23,9 @@ export function RunnerPanel({ runner, snapshot, busy, onAction }: RunnerPanelPro
                 <>
                     <p>当前没有运行中的 runner。</p>
                     {snapshot === "verified" && (
-                        <>
-                            <button type="button" disabled={busy} onClick={() => onAction({ kind: "check" })}>
-                                检查运行环境
-                            </button>
-                            <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => onAction({ kind: "login_claude" })}
-                            >
-                                登录并共享 Claude
-                            </button>
-                        </>
+                        <button type="button" disabled={busy} onClick={() => onAction({ kind: "check" })}>
+                            检查运行环境
+                        </button>
                     )}
                 </>
             );

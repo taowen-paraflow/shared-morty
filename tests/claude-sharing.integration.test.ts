@@ -2,23 +2,8 @@
 import { fireEvent, getByLabelText, getByRole, queryByRole } from "@testing-library/dom";
 import { expect, test } from "vitest";
 import { mountLauncher } from "../src/launcher/app.tsx";
+import { visibleStatus as visible } from "./support/launcher-ui.ts";
 import { loginGitHubServer } from "./support/login-github.ts";
-
-function visible(root: HTMLElement, content: string): Promise<void> {
-    const settled = () =>
-        root.textContent?.includes(content) &&
-        root.querySelector('[role="status"]')?.getAttribute("aria-busy") !== "true";
-    if (settled()) return Promise.resolve();
-    return new Promise((resolve) => {
-        const observer = new MutationObserver(() => {
-            if (settled()) {
-                observer.disconnect();
-                resolve();
-            }
-        });
-        observer.observe(root, { childList: true, subtree: true, attributes: true });
-    });
-}
 
 test("Given the authorization form has focus, when a malformed code is rejected, then focus stays in the cleared code field", async () => {
     const github = await loginGitHubServer();
@@ -30,7 +15,9 @@ test("Given the authorization form has focus, when a malformed code is rejected,
         fireEvent.input(getByLabelText(root, "GitHub Token"), { target: { value: "fixture-token" } });
         fireEvent.click(getByRole(root, "button", { name: "连接 GitHub" }));
         await visible(root, "当前没有运行中的 runner");
-        fireEvent.click(getByRole(root, "button", { name: "登录并共享 Claude" }));
+        fireEvent.click(getByRole(root, "button", { name: "共享 Claude Code" }));
+        await visible(root, "为团队提供你自己的 Claude Code 账号");
+        fireEvent.click(getByRole(root, "button", { name: "开始 Claude 授权" }));
         await visible(root, "等待登录任务");
         await github.publishChallenge();
         fireEvent.click(getByRole(root, "button", { name: "刷新登录状态" }));
@@ -49,7 +36,7 @@ test("Given the authorization form has focus, when a malformed code is rejected,
     }
 });
 
-test("Given an owner's pending login, when she cancels, then the launcher requests cancellation of that login and returns to her runner state", async () => {
+test("Given an owner's pending login, when she cancels, then the launcher requests cancellation and returns to sharing settings", async () => {
     const github = await loginGitHubServer();
     const root = document.createElement("main");
     document.body.append(root);
@@ -59,12 +46,15 @@ test("Given an owner's pending login, when she cancels, then the launcher reques
         fireEvent.input(getByLabelText(root, "GitHub Token"), { target: { value: "fixture-token" } });
         fireEvent.click(getByRole(root, "button", { name: "连接 GitHub" }));
         await visible(root, "当前没有运行中的 runner");
-        fireEvent.click(getByRole(root, "button", { name: "登录并共享 Claude" }));
+        fireEvent.click(getByRole(root, "button", { name: "共享 Claude Code" }));
+        await visible(root, "为团队提供你自己的 Claude Code 账号");
+        fireEvent.click(getByRole(root, "button", { name: "开始 Claude 授权" }));
         await visible(root, "等待登录任务");
         fireEvent.click(getByRole(root, "button", { name: "取消登录" }));
         await visible(root, "已请求停止登录");
-        fireEvent.click(getByRole(root, "button", { name: "返回环境" }));
-        await visible(root, "当前没有运行中的 runner");
+        fireEvent.click(getByRole(root, "button", { name: "返回共享设置" }));
+        await visible(root, "为团队提供你自己的 Claude Code 账号");
+        expect(getByRole(root, "button", { name: "开始 Claude 授权" })).toBeDefined();
         expect(github.sharedToken()).toBeNull();
     } finally {
         unmount();
@@ -83,7 +73,9 @@ test("Given an owner in a public repository, when she authorizes Claude and shar
         fireEvent.input(getByLabelText(root, "GitHub Token"), { target: { value: "fixture-token" } });
         fireEvent.click(getByRole(root, "button", { name: "连接 GitHub" }));
         await visible(root, "当前没有运行中的 runner");
-        fireEvent.click(getByRole(root, "button", { name: "登录并共享 Claude" }));
+        fireEvent.click(getByRole(root, "button", { name: "共享 Claude Code" }));
+        await visible(root, "为团队提供你自己的 Claude Code 账号");
+        fireEvent.click(getByRole(root, "button", { name: "开始 Claude 授权" }));
         await visible(root, "等待登录任务");
         await github.publishChallenge();
         fireEvent.click(getByRole(root, "button", { name: "刷新登录状态" }));

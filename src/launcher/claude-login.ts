@@ -98,7 +98,7 @@ export async function refreshClaudeLogin(
     if (state.kind === "shared" || state.kind === "failed" || state.kind === "authorized") return state;
     const { context } = state;
     if (Date.now() >= context.request.expiresAt)
-        return { kind: "failed", notice: "登录已超时，请返回环境后重新登录。" };
+        return { kind: "failed", notice: "登录已超时，请返回共享设置后重新登录。" };
     const messages: LoginMessage[] = [];
     for (const comment of await context.channel.comments(context.issue, signal)) {
         if (comment.user?.id !== ACTIONS_BOT_ID || comment.user.type !== "Bot") continue;
@@ -248,5 +248,5 @@ export async function cancelClaudeLogin(
         signal,
     );
     await client.cancelRunner(context.repository, inspection.runner.run.id, signal);
-    return { kind: "failed", notice: "已请求停止登录，请返回环境确认任务结束。" };
+    return { kind: "failed", notice: "已请求停止登录，可在“使用团队账号”页刷新确认任务结束。" };
 }

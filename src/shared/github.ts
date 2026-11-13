@@ -9,7 +9,13 @@ import {
     githubUserSchema,
 } from "./github-schema.ts";
 import { LoginGitHub } from "./login-github.ts";
-import { type ActiveRun, type RunnerInspection, repositoryName, runnerState } from "./runner-status.ts";
+import {
+    type ActiveRun,
+    type RunnerInspection,
+    repositoryName,
+    runnerState,
+    type UserIdentity,
+} from "./runner-status.ts";
 
 const MAX_PAGES = 10;
 
@@ -23,11 +29,24 @@ export class GitHubClient {
     readonly loginChannel = (repository: string): LoginGitHub =>
         new LoginGitHub(this.#http, repositoryName(repository));
 
+    async #user(signal: AbortSignal): Promise<UserIdentity> {
+        const parsed = v.safeParse(githubUserSchema, await this.#http.get("/user", signal));
+        if (!parsed.success) throw new AppError("invalid_response");
+        return { id: String(parsed.output.id), login: parsed.output.login };
+    }
+
+    readonly connectRepository = async (repository: string, signal: AbortSignal) => {
+        const name = repositoryName(repository);
+        const user = await this.#user(signal);
+        const parsed = v.safeParse(githubRepositorySchema, await this.#http.get(`/repos/${name}`, signal));
+        if (!parsed.success || parsed.output.full_name.toLowerCase() !== name)
+            throw new AppError("invalid_response");
+        return { repository: name, user };
+    };
+
     readonly inspectRunner = async (repository: string, signal: AbortSignal): Promise<RunnerInspection> => {
         const name = repositoryName(repository);
-        const parsedUser = v.safeParse(githubUserSchema, await this.#http.get("/user", signal));
-        if (!parsedUser.success) throw new AppError("invalid_response");
-        const user = { id: String(parsedUser.output.id), login: parsedUser.output.login };
+        const user = await this.#user(signal);
         const runs = new Map<number, ActiveRun>();
         for (let page = 1; page <= MAX_PAGES; page++) {
             const query = new URLSearchParams({
@@ -45,7 +64,7 @@ export class GitHubClient {
             for (const run of parsed.output.workflow_runs) {
                 const workflow = run.path.split("@")[0];
                 if (
-                    run.actor?.id === parsedUser.output.id &&
+                    String(run.actor?.id) === user.id &&
                     run.display_title.startsWith(`shared-morty-${user.id}-`) &&
                     (workflow === ".github/workflows/runner.yml" ||
                         workflow === ".github/workflows/login.yml") &&

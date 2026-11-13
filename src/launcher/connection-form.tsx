@@ -1,5 +1,5 @@
 import { type SubmitEvent, useRef } from "react";
-import type { ConnectionInput } from "./state.ts";
+import type { ConnectionInput } from "./connection.ts";
 
 export function ConnectionForm({ onConnect }: { readonly onConnect: (input: ConnectionInput) => void }) {
     const repository = useRef<HTMLInputElement>(null);

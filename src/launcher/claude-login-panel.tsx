@@ -1,7 +1,7 @@
 import { type SubmitEvent, useRef } from "react";
 import { assertNever } from "../shared/runner-status.ts";
 import type { ClaudeLoginState } from "./claude-login.ts";
-import type { LauncherAction } from "./state.ts";
+import type { ClaudeActions } from "./claude-sharing-page.tsx";
 
 function AuthorizationForm({
     busy,
@@ -34,16 +34,16 @@ function AuthorizationForm({
 interface LoginPanelProps {
     readonly login: ClaudeLoginState;
     readonly busy: boolean;
-    readonly onAction: (action: LauncherAction) => void;
+    readonly actions: ClaudeActions;
 }
 
-function LoginStep({ login, busy, onAction }: LoginPanelProps) {
+function LoginStep({ login, busy, actions }: LoginPanelProps) {
     switch (login.kind) {
         case "waiting":
             return (
                 <>
                     <p>等待登录任务。稍后点击刷新登录状态，请保持本页打开。</p>
-                    <button type="button" disabled={busy} onClick={() => onAction({ kind: "login_refresh" })}>
+                    <button type="button" disabled={busy} onClick={actions.refresh}>
                         刷新登录状态
                     </button>
                 </>
@@ -55,17 +55,14 @@ function LoginStep({ login, busy, onAction }: LoginPanelProps) {
                     <a href={login.challenge.url} target="_blank" rel="noopener noreferrer">
                         打开 Claude 官方授权页面
                     </a>
-                    <AuthorizationForm
-                        busy={busy}
-                        onCode={(code) => onAction({ kind: "login_code", code })}
-                    />
+                    <AuthorizationForm busy={busy} onCode={actions.submitCode} />
                 </>
             );
         case "waiting_token":
             return (
                 <>
                     <p>已发送授权码，等待 Claude 完成授权。</p>
-                    <button type="button" disabled={busy} onClick={() => onAction({ kind: "login_refresh" })}>
+                    <button type="button" disabled={busy} onClick={actions.refresh}>
                         刷新登录状态
                     </button>
                 </>
@@ -75,7 +72,7 @@ function LoginStep({ login, busy, onAction }: LoginPanelProps) {
                 <>
                     <p>已登录，尚未共享。共享后，仓库运行成员可使用此 Claude 账号。</p>
                     <p>共享将写入或替换此仓库已有的 Claude 凭据。</p>
-                    <button type="button" disabled={busy} onClick={() => onAction({ kind: "share_claude" })}>
+                    <button type="button" disabled={busy} onClick={actions.publish}>
                         共享到此仓库
                     </button>
                 </>
@@ -84,15 +81,15 @@ function LoginStep({ login, busy, onAction }: LoginPanelProps) {
             return (
                 <>
                     <p>团队 Claude 已共享。</p>
-                    <button type="button" disabled={busy} onClick={() => onAction({ kind: "login_back" })}>
-                        返回环境
+                    <button type="button" disabled={busy} onClick={actions.reset}>
+                        返回共享设置
                     </button>
                 </>
             );
         case "failed":
             return (
-                <button type="button" disabled={busy} onClick={() => onAction({ kind: "login_back" })}>
-                    返回环境
+                <button type="button" disabled={busy} onClick={actions.reset}>
+                    返回共享设置
                 </button>
             );
         default:
@@ -101,12 +98,12 @@ function LoginStep({ login, busy, onAction }: LoginPanelProps) {
 }
 
 export function ClaudeLoginPanel(props: LoginPanelProps) {
-    const { login, busy, onAction } = props;
+    const { login, busy, actions } = props;
     return (
         <>
             {login.kind !== "shared" && login.notice && <p>{login.notice}</p>}
             {login.kind !== "shared" && login.kind !== "failed" && (
-                <button type="button" disabled={busy} onClick={() => onAction({ kind: "login_cancel" })}>
+                <button type="button" disabled={busy} onClick={actions.cancel}>
                     取消登录
                 </button>
             )}

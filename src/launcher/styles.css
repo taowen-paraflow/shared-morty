@@ -9,7 +9,7 @@ body {
 }
 main {
     max-width: 620px;
-    margin: 10vh auto;
+    margin: 5vh auto;
     padding: 32px;
 }
 h1 {
@@ -78,4 +78,33 @@ a {
     color: #225c49;
     display: block;
     margin: 8px 0;
+}
+
+nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #c8d2c5;
+}
+nav button {
+    background: transparent;
+    color: #225c49;
+    border: 1px solid #9aac9c;
+}
+nav button[aria-current="page"] {
+    background: #225c49;
+    color: white;
+}
+button:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+section button {
+    margin: 4px 8px 4px 0;
 }

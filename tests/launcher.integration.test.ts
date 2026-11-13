@@ -3,22 +3,7 @@ import { fireEvent, getByLabelText, getByRole, queryByRole } from "@testing-libr
 import { expect, test } from "vitest";
 import { mountLauncher } from "../src/launcher/app.tsx";
 import { githubServer } from "./support/github-server.ts";
-
-function visible(root: HTMLElement, content: string): Promise<void> {
-    const settled = () =>
-        root.textContent?.includes(content) &&
-        root.querySelector('[role="status"]')?.getAttribute("aria-busy") !== "true";
-    if (settled()) return Promise.resolve();
-    return new Promise((resolve) => {
-        const observer = new MutationObserver(() => {
-            if (settled()) {
-                observer.disconnect();
-                resolve();
-            }
-        });
-        observer.observe(root, { childList: true, subtree: true, attributes: true });
-    });
-}
+import { visibleStatus as visible } from "./support/launcher-ui.ts";
 
 test("Given status is still loading, when Alice reconnects, then an older response cannot replace the new environment", async () => {
     const github = await githubServer();

@@ -1,53 +1,49 @@
-import { assertNever } from "../shared/runner-status.ts";
-import { ClaudeLoginPanel } from "./claude-login-panel.tsx";
+import { useState } from "react";
+import { ClaudeSharingPage } from "./claude-sharing-page.tsx";
+import { type LauncherOptions, type Session, useConnection } from "./connection.ts";
 import { ConnectionForm } from "./connection-form.tsx";
-import { RunnerPanel } from "./runner-panel.tsx";
-import type { LauncherAction, LauncherState } from "./state.ts";
-import { type LauncherOptions, useLauncher } from "./use-launcher.ts";
+import { UsagePage } from "./usage-page.tsx";
 
-interface ScreenProps {
-    readonly state: Exclude<LauncherState, { readonly kind: "working" }>;
-    readonly busy: boolean;
-    readonly onAction: (action: LauncherAction) => void;
+type Page = "use" | "share_claude" | "share_codex";
+function Workspace({ session, lifetime }: { readonly session: Session; readonly lifetime: AbortSignal }) {
+    const [page, setPage] = useState<Page>("use");
+    return (
+        <>
+            <nav aria-label="功能">
+                <button
+                    type="button"
+                    aria-current={page === "use" ? "page" : undefined}
+                    onClick={() => setPage("use")}
+                >
+                    使用团队账号
+                </button>
+                <button
+                    type="button"
+                    aria-current={page === "share_claude" ? "page" : undefined}
+                    onClick={() => setPage("share_claude")}
+                >
+                    共享 Claude Code
+                </button>
+                <button
+                    type="button"
+                    aria-current={page === "share_codex" ? "page" : undefined}
+                    onClick={() => setPage("share_codex")}
+                >
+                    共享 Codex
+                </button>
+            </nav>
+            {page === "use" && <UsagePage session={session} lifetime={lifetime} />}
+            <ClaudeSharingPage session={session} lifetime={lifetime} hidden={page !== "share_claude"} />
+            {page === "share_codex" && (
+                <section role="status" aria-live="polite">
+                    <h2>共享我的 Codex 账号</h2>
+                    <p>Codex 账号共享尚未实现。</p>
+                    <p>此功能用于为团队提供自己的 Codex 账号。使用团队已有账号请前往“使用团队账号”。</p>
+                </section>
+            )}
+        </>
+    );
 }
-
-function Screen({ state, busy, onAction }: ScreenProps) {
-    switch (state.kind) {
-        case "disconnected":
-            return <p>尚未连接 GitHub。</p>;
-        case "connecting":
-            return <p>正在确认身份与运行状态…</p>;
-        case "failed":
-            return <p>{state.error.message}</p>;
-        case "claude_login":
-            return (
-                <>
-                    <p>已连接 {state.session.inspection.user.login}</p>
-                    <ClaudeLoginPanel login={state.login} busy={busy} onAction={onAction} />
-                </>
-            );
-        case "ready":
-        case "needs_refresh":
-            return (
-                <>
-                    <p>已连接 {state.session.inspection.user.login}</p>
-                    {state.kind === "needs_refresh" && <p>{state.notice}</p>}
-                    <button type="button" disabled={busy} onClick={() => onAction({ kind: "refresh" })}>
-                        刷新状态
-                    </button>
-                    <RunnerPanel
-                        runner={state.session.inspection.runner}
-                        snapshot={state.kind === "ready" ? "verified" : "stale"}
-                        busy={busy}
-                        onAction={onAction}
-                    />
-                </>
-            );
-        default:
-            return assertNever(state);
-    }
-}
-
 export function Launcher({
     options,
     lifetime,
@@ -55,21 +51,34 @@ export function Launcher({
     readonly options: LauncherOptions;
     readonly lifetime: AbortSignal;
 }) {
-    const { state, connect, act } = useLauncher(options, lifetime);
-    const screen = state.kind === "working" ? state.previous : state;
-    const busy = state.kind === "working" || state.kind === "connecting";
+    const { state, connect } = useConnection(options, lifetime);
     return (
         <>
             <header>
                 <p className="eyebrow">SHARED MORTY</p>
-                <h1>你的环境，你的对话。</h1>
-                <p>连接 GitHub，查看属于你的运行环境。</p>
+                <h1>团队账号，独立对话。</h1>
+                <p>使用团队账号，或为团队共享你自己的 Claude Code / Codex 账号。</p>
             </header>
-            <ConnectionForm onConnect={connect} />
-            <section role="status" aria-live="polite" aria-busy={busy}>
-                {state.kind === "working" && <p>正在处理，请稍候…</p>}
-                <Screen state={screen} busy={busy} onAction={act} />
-            </section>
+            <details open={state.kind !== "connected"}>
+                <summary>
+                    {state.kind === "connected"
+                        ? `已连接 ${state.session.user.login} · ${state.session.repository}`
+                        : "连接 GitHub"}
+                </summary>
+                <p>GitHub 连接用于确认身份和操作执行仓库。重新连接会清除本页尚未共享的授权结果。</p>
+                <ConnectionForm onConnect={connect} />
+            </details>
+            {state.kind === "connected" ? (
+                <Workspace key={state.session.id} session={state.session} lifetime={lifetime} />
+            ) : (
+                <section role="status" aria-live="polite" aria-busy={state.kind === "connecting"}>
+                    {state.kind === "disconnected"
+                        ? "尚未连接 GitHub。"
+                        : state.kind === "connecting"
+                          ? "正在确认 GitHub 身份与仓库…"
+                          : state.error.message}
+                </section>
+            )}
         </>
     );
 }
