@@ -7,20 +7,12 @@ import {
     refreshClaudeLogin,
     sendClaudeCode,
 } from "./claude-login.ts";
-import { ClaudeLoginPanel } from "./claude-login-panel.tsx";
+import { type ClaudeActions, ClaudeLoginPanel } from "./claude-login-panel.tsx";
 import type { Session } from "./connection.ts";
 import { useTask } from "./use-task.ts";
 
 type Settled = { readonly kind: "intro" } | { readonly kind: "login"; readonly login: ClaudeLoginState };
 type SharingState = Settled | { readonly kind: "working"; readonly previous: Settled };
-
-export interface ClaudeActions {
-    readonly refresh: () => void;
-    readonly submitCode: (code: string) => void;
-    readonly publish: () => void;
-    readonly cancel: () => void;
-    readonly reset: () => void;
-}
 
 export function ClaudeSharingPage({
     session,

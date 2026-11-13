@@ -13,6 +13,7 @@ import { AppError, publicError } from "../shared/errors.ts";
 import type { GitHubClient } from "../shared/github.ts";
 import { createLoginKey, type LoginKey, open } from "../shared/login-crypto.ts";
 import { ACTIONS_BOT_ID, parseJson } from "../shared/login-protocol.ts";
+import { assertNever } from "../shared/runner-status.ts";
 
 interface ChatContext {
     readonly repository: string;
@@ -65,20 +66,17 @@ export async function beginPersonalChat(
     return { kind: "waiting", context, notice: "个人 Claude 正在启动，请刷新聊天状态。" };
 }
 
-export async function refreshPersonalChat(
+type ChatOutcome =
+    | { readonly kind: "none" }
+    | Extract<PersonalChat, { readonly kind: "ready" | "stopped" | "failed" }>;
+
+async function readChatOutcome(
     client: GitHubClient,
-    state: PersonalChat,
+    context: ChatContext,
     signal: AbortSignal,
-): Promise<PersonalChat> {
-    if (state.kind === "failed" || state.kind === "stopped") return state;
-    const { context } = state;
-    if (Date.now() >= context.request.expiresAt)
-        return { kind: "stopped", notice: "聊天任务已到期，请刷新运行状态后重新启动。" };
-    const channel = client.chatChannel(context.repository);
-    let ready: Extract<PersonalChat, { readonly kind: "ready" }> | undefined;
-    let stopped = false;
-    let failure: string | undefined;
-    for (const comment of await channel.comments(context.issue, signal)) {
+): Promise<ChatOutcome> {
+    let outcome: ChatOutcome = { kind: "none" };
+    for (const comment of await client.chatChannel(context.repository).comments(context.issue, signal)) {
         if (comment.user?.id !== ACTIONS_BOT_ID || comment.user.type !== "Bot") continue;
         let raw: unknown;
         try {
@@ -116,17 +114,18 @@ export async function refreshPersonalChat(
             case "error": {
                 const error = v.safeParse(chatErrorSchema, data);
                 if (!error.success) throw new AppError("invalid_response");
-                failure = new AppError(error.output.code).message;
+                outcome = { kind: "failed", notice: new AppError(error.output.code).message };
                 break;
             }
             case "stopped":
                 if (!v.safeParse(v.strictObject({}), data).success) throw new AppError("invalid_response");
-                stopped = true;
+                if (outcome.kind !== "failed")
+                    outcome = { kind: "stopped", notice: "个人聊天已停止，未保存本次历史。" };
                 break;
             case "ready": {
                 const result = v.safeParse(chatReadySchema, data);
                 if (!result.success) throw new AppError("invalid_response");
-                ready = {
+                const ready: Extract<PersonalChat, { readonly kind: "ready" }> = {
                     kind: "ready",
                     context,
                     header,
@@ -134,19 +133,35 @@ export async function refreshPersonalChat(
                     accessExpiresAt: result.output.accessExpiresAt,
                     notice: "个人 Claude 聊天已就绪。",
                 };
+                // A later ready message cannot revive a stopped task or hide an earlier failure.
+                if (outcome.kind !== "failed" && outcome.kind !== "stopped") outcome = ready;
                 break;
             }
+            default:
+                return assertNever(header.kind);
         }
     }
-    if (failure) return { kind: "failed", notice: failure };
-    if (stopped) return { kind: "stopped", notice: "个人聊天已停止，未保存本次历史。" };
+    return outcome;
+}
+
+export async function refreshPersonalChat(
+    client: GitHubClient,
+    state: PersonalChat,
+    signal: AbortSignal,
+): Promise<PersonalChat> {
+    if (state.kind === "failed" || state.kind === "stopped") return state;
+    const { context } = state;
+    if (Date.now() >= context.request.expiresAt)
+        return { kind: "stopped", notice: "聊天任务已到期，请刷新运行状态后重新启动。" };
+    const outcome = await readChatOutcome(client, context, signal);
+    if (outcome.kind === "failed" || outcome.kind === "stopped") return outcome;
     if (state.kind === "stopping") {
         const inspection = await client.inspectRunner(context.repository, signal);
         return inspection.runner.kind === "idle"
             ? { kind: "stopped", notice: "个人聊天已停止，未保存本次历史。" }
             : state;
     }
-    if (ready) {
+    if (outcome.kind === "ready") {
         const inspection = await client.inspectRunner(context.repository, signal);
         const runs =
             inspection.runner.kind === "active"
@@ -155,11 +170,11 @@ export async function refreshPersonalChat(
                   ? inspection.runner.runs
                   : [];
         if (
-            !runs.some((run) => String(run.id) === ready.header.runId) ||
-            Date.now() >= Date.parse(ready.accessExpiresAt)
+            !runs.some((run) => String(run.id) === outcome.header.runId) ||
+            Date.now() >= Date.parse(outcome.accessExpiresAt)
         )
             return { kind: "stopped", notice: "个人聊天已结束或访问已到期，请刷新运行状态。" };
-        return ready;
+        return outcome;
     }
     return state;
 }

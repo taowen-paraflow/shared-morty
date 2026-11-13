@@ -1,7 +1,13 @@
 import { type SubmitEvent, useRef } from "react";
 import { assertNever } from "../shared/runner-status.ts";
 import type { ClaudeLoginState } from "./claude-login.ts";
-import type { ClaudeActions } from "./claude-sharing-page.tsx";
+export interface ClaudeActions {
+    readonly refresh: () => void;
+    readonly submitCode: (code: string) => void;
+    readonly publish: () => void;
+    readonly cancel: () => void;
+    readonly reset: () => void;
+}
 
 function AuthorizationForm({
     busy,

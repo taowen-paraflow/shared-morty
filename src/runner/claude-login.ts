@@ -18,16 +18,8 @@ import {
 } from "../shared/login-protocol.ts";
 import { repositoryName } from "../shared/runner-status.ts";
 import { ClaudeTerminal } from "./claude-terminal.ts";
+import type { IssueExecution } from "./issue-execution.ts";
 
-export interface LoginExecution {
-    readonly repository: string;
-    readonly runId: string;
-    readonly userId: string;
-    readonly ref: string;
-    readonly requestId: string;
-    readonly attempt: number;
-    readonly issue: number;
-}
 interface LoginRuntime {
     readonly diagnostic?: DiagnosticSink;
     readonly clock: {
@@ -47,7 +39,7 @@ const runtime: LoginRuntime = {
 
 export async function runClaudeLogin(
     client: GitHubClient,
-    input: LoginExecution,
+    input: IssueExecution,
     signal: AbortSignal,
     options: LoginRuntime = runtime,
 ): Promise<void> {

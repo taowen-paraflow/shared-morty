@@ -5,6 +5,51 @@ import { GitHubClient } from "../src/shared/github.ts";
 import { createLoginKey, seal } from "../src/shared/login-crypto.ts";
 import { loginGitHubServer } from "./support/login-github.ts";
 
+test.each(["error", "stopped"])(
+    "Given a verified %s outcome, when a later ready message arrives, then refreshing cannot reopen the chat",
+    async (terminal) => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-13T00:00:00Z"));
+        const github = await loginGitHubServer({ workflow: "chat" });
+        const signal = new AbortController().signal;
+        try {
+            const browser = new GitHubClient("fixture-token", github.origin);
+            const state = await beginPersonalChat(browser, "team/execution", signal);
+            if (state.kind !== "waiting") throw new Error("Missing launch context");
+            const worker = new GitHubClient("runner-token", github.origin).chatChannel("team/execution");
+            const send = async (kind: ChatHeader["kind"], data: unknown) => {
+                const header: ChatHeader = {
+                    version: 1,
+                    purpose: "claude_chat",
+                    kind,
+                    requestId: state.context.request.requestId,
+                    runId: "701",
+                    attempt: 1,
+                    expiresAt: state.context.request.expiresAt,
+                };
+                const payload = await seal(
+                    state.context.key.publicKey,
+                    data,
+                    chatContext("team/execution", 601, header),
+                );
+                await worker.send(601, { ...header, payload }, signal);
+            };
+            if (terminal === "error") await send("error", { code: "agent_failed" });
+            await send("stopped", {});
+            await send("ready", {
+                url: "https://morty.build/continue?harness=claude&sessionId=123e4567-e89b-42d3-a456-426614174000#code=fixture",
+                accessExpiresAt: "2026-11-13T01:00:00.000Z",
+            });
+            expect(await refreshPersonalChat(browser, state, signal)).toMatchObject({
+                kind: terminal === "error" ? "failed" : "stopped",
+            });
+        } finally {
+            await github.close();
+            vi.useRealTimers();
+        }
+    },
+);
+
 test.each(["wrong_author", "wrong_attempt", "wrong_issue", "wrong_key"])(
     "Given a private chat startup, when a ready message has %s, then it cannot grant a Morty link",
     async (fault) => {

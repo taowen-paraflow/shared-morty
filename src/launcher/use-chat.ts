@@ -1,4 +1,6 @@
 import { useState } from "react";
+import type { AppError } from "../shared/errors.ts";
+import { assertNever } from "../shared/runner-status.ts";
 import type { Session } from "./connection.ts";
 import {
     beginPersonalChat,
@@ -10,6 +12,22 @@ import { useTask } from "./use-task.ts";
 
 type Settled = { readonly kind: "idle" } | PersonalChat;
 type ChatState = Settled | { readonly kind: "working"; readonly previous: Settled };
+function recoverChat(previous: Settled, error: AppError): Settled {
+    switch (previous.kind) {
+        case "ready":
+            return { kind: "waiting", context: previous.context, notice: error.message };
+        case "waiting":
+        case "stopping":
+            return { ...previous, notice: error.message };
+        case "idle":
+        case "failed":
+        case "stopped":
+            return { kind: "failed", notice: error.message };
+        default:
+            return assertNever(previous);
+    }
+}
+
 export function useChat(session: Session, lifetime: AbortSignal) {
     const [state, setState] = useState<ChatState>({ kind: "idle" });
     const run = useTask(lifetime);
@@ -20,14 +38,7 @@ export function useChat(session: Session, lifetime: AbortSignal) {
         run(operation, {
             started: () => setState({ kind: "working", previous }),
             succeeded: setState,
-            failed: (error) =>
-                setState(
-                    previous.kind === "waiting" || previous.kind === "ready" || previous.kind === "stopping"
-                        ? previous.kind === "ready"
-                            ? { kind: "waiting", context: previous.context, notice: error.message }
-                            : { ...previous, notice: error.message }
-                        : { kind: "failed", notice: error.message },
-                ),
+            failed: (error) => setState(recoverChat(previous, error)),
         });
     };
     return {
