@@ -5,7 +5,22 @@ metadata:
 
 # shared-morty 状态与文件读写约定
 
-设计草案，2026-11-13；尚未实现。本文按“谁持有状态、谁读、谁写、何时提交”组织。用户操作见 [user-journey.md](./user-journey.md)。
+设计草案，2026-11-13；共享认证和个人归档尚未实现。本文按“谁持有状态、谁读、谁写、何时提交”组织。用户操作见 [user-journey.md](./user-journey.md)。
+
+当前已实现运行控制：launcher 查询本人任务、向默认分支的 `runner.yml` 提交环境检查、手动刷新、重新核验归属后请求停止本人任务。检查任务使用真实 actor id 的 concurrency group，验证私有仓库、默认分支、run 的 actor / event / workflow / request id，只报告共享 Secret 是否存在后退出，不启动 Agent 或 Morty。`SHARED_AUTH_KEY` 存在不代表 `codex.enc` 已验证可用。
+
+当前实现涉及的状态与读写者：
+
+| 状态 / 文件 | 谁写 | 谁读 | 生命周期 |
+| --- | --- | --- | --- |
+| 浏览器内存中的 PAT、目标仓库、运行快照、操作结果 | 本人输入、launcher 的 GitHub API 响应 | 本页 launcher | 输入框连接时清空；不写 localStorage / IndexedDB；刷新页面后重新连接 |
+| workflow dispatch inputs：`mode=check`、随机 UUID `request_id` | launcher | GitHub、检查进程 | 不携带用户 id 或任何密钥；提交成功不等于任务已启动 |
+| Actions `GITHUB_EVENT_PATH` 指向的事件 JSON | GitHub | `src/runner/check.ts` | 本次 job 临时文件；校验 schema，再用 job token 核对真实 run |
+| job 环境中的 `GH_TOKEN` | GitHub 注入 job token | 检查进程的 GitHub HTTP client | 仅 contents / actions read，不传给其他子进程 |
+| `SHARED_CLAUDE_AVAILABLE` / `SHARED_CODEX_AVAILABLE` | workflow 根据 Secret 是否为空计算字符串布尔值 | 检查进程 | 只传存在标记，不传 Secret 内容；不进行登录或认证有效性验证 |
+| 检查 stdout 的 sanitized JSON / Actions 日志 | 检查进程 | 运行者通过 Actions 页面查看 | 含本人 id、request id、Secret 存在标记及 `chat=not_implemented`，不含凭据或聊天 |
+
+页面尚不读取检查结果，只显示运行状态和 GitHub 任务链接；失败和完成详情在 Actions 查看。停止使用普通 cancel API，不代表立即退出，也没有归档保证；必须刷新确认。以下完整登录、认证和归档流程仍是待实现设计。
 
 ## 1. 范围与进程名称
 

@@ -7,7 +7,7 @@ metadata:
 
 Share Claude Code and Codex with your team while keeping personal conversations and execution environments separate.
 
-The current foundation connects to GitHub and shows the authenticated user's runner state through a static launcher or CLI. Account sharing, runner dispatch, and encrypted history are specified in the design and are not implemented yet.
+The static launcher connects to GitHub, inspects the authenticated user's runners, dispatches an execution-environment check, refreshes status, and requests cancellation of owned tasks. The CLI also exposes status inspection. The check workflow verifies private-repository/default-branch execution and reports shared-secret presence; it does not start a chat. Account login/sharing, Morty integration, credential refresh, and encrypted history remain unimplemented.
 
 Start with [Contributing](docs/CONTRIBUTING.md) for local commands, [Testing](docs/TESTING.md) for acceptance boundaries, and [Engineering rules](AGENTS.md) before making changes.
 
