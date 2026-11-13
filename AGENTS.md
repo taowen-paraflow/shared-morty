@@ -9,9 +9,11 @@ These rules adapt Morty's engineering practices to shared-morty. Read [Contribut
 
 ## Product scope
 
+- Support Claude Code only.
+
 - Keep the static launcher, Actions runner, and shared contracts in one small TypeScript project. Add boundaries for real use cases, not hypothetical extensions.
 - Do not introduce a database, permanent control service, download/export flow, or per-member OAuth authorization.
-- A user has one running runner across login and both Agents. Different users can run concurrently. Shared credentials and personal history have different ownership and encryption keys.
+- A user has one running runner across login, Claude chat, and environment checks. Different users can run concurrently. Shared credentials and personal history have different ownership and encryption keys.
 - Treat the manual experiments under `experiments/` as research evidence, not production modules or the default automated test suite.
 
 ## Trust and contracts

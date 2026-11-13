@@ -7,15 +7,14 @@ metadata:
 
 设计与实现状态，2026-11-13。静态 launcher + GitHub Actions + Morty，不增加数据库、常驻后台、下载或导出功能。文件及读写者见 [state.md](./state.md)。
 
-## 三个独立入口
+## 两个独立入口
 
 连接 GitHub 后，用户按目的选择入口。共享是账号提供者的工作，使用是团队成员的工作；二者不会串成必经步骤。
 
 | 入口 | 用户目的 | 当前能力 |
 | --- | --- | --- |
-| 使用团队账号 | 使用别人已提供的 Claude / Codex 账号，进入自己的对话环境 | 已实现临时个人 Claude / Morty 聊天、本人任务控制；Codex 聊天和历史恢复尚未实现 |
+| 使用团队账号 | 使用别人已提供的 Claude Code 账号，进入自己的对话环境 | 已实现临时个人 Claude / Morty 聊天、本人任务控制；历史恢复尚未实现 |
 | 共享 Claude Code | 将自己的 Claude 账号提供给执行仓库成员 | 已实现官方授权、加密交换、显式发布 Secret |
-| 共享 Codex | 将自己的 Codex 账号提供给执行仓库成员 | 独立说明页；授权、发布及刷新协调尚未实现 |
 
 “使用团队账号”是默认入口。它不要求用户先共享账号，也不展示提供者的授权表单。环境检查只是诊断，不是聊天启动按钮。共享页只展示对应账号的授权和发布步骤，不混入环境检查。
 
@@ -33,7 +32,7 @@ metadata:
 
 页面通过 GitHub API 确认本人和目标仓库，成功后连接区收起并显示身份与仓库。Token 输入框立即清空，连接加密保存在此浏览器；刷新后自动重新核验 GitHub 身份并恢复连接。请使用自己的浏览器配置文件；清除此网站数据会丢失连接和环境恢复密钥。连接本身不会启动任务或读取 Secrets。
 
-一般使用者不需要 Secrets 写入权限。Claude 账号提供者需要 Actions / Issues 读写及仓库 Secrets 读写权限。这里的 GitHub 身份连接与模型账号授权是两件事，不要求每位成员进行 Claude / Codex OAuth。
+一般使用者不需要 Secrets 写入权限。Claude 账号提供者需要 Actions / Issues 读写及仓库 Secrets 读写权限。这里的 GitHub 身份连接与模型账号授权是两件事，不要求每位成员进行 Claude Code OAuth。
 
 展开连接区可以重新连接；页面提前说明，重新连接会丢弃未共享的授权结果。重新连接或页面销毁会取消旧页面请求，但不等于停止已经提交到 GitHub 的任务。
 
@@ -47,22 +46,11 @@ metadata:
 
 分享给整个执行仓库的运行成员，不选择接收者、不设置期限。共享模型账号不会共享 Alice 的个人会话、文件或 Morty 身份。Secrets 写入失败时保留本页授权结果，可以重试；重新授权本身不自动替换已有共享。
 
-切换到使用页或 Codex 页不会丢弃未完成的 Claude 授权；返回 Claude 共享页可继续。其他页不展示 Claude 授权控件。刷新、关闭页面或更换连接会丢失临时私钥和未共享 token，无法恢复本次交换。交换有效期自发起起 15 分钟，包含排队。
+切换到使用页不会丢弃未完成的 Claude 授权；返回 Claude 共享页可继续。其他页不展示 Claude 授权控件。刷新、关闭页面或更换连接会丢失临时私钥和未共享 token，无法恢复本次交换。交换有效期自发起起 15 分钟，包含排队。
 
 共享前可“取消登录”：等待阶段只请求取消本次核验过的登录任务，拿到 token 后则放弃未共享结果。返回共享设置不会撤销已有 Secret；任务是否已结束可到使用页刷新确认。
 
 本流程已在当前公开仓库完成真实授权和 Secrets 发布；另一个 runner 的官方 CLI 已识别注入的 token。后续真实 runner 已使用同一共享 Secret 完成一轮官方 Claude Code 模型问答，答案校验通过；其他成员角色及多人并发仍未验证。之后的个人聊天流程见下文；上述凭据探测本身不代表网页链路验证。未重新授权或改写共享 Secret。
-
-## 共享 Codex：Alice 提供自己的账号
-
-当前独立页面只说明尚未实现，不提供会被误认为可用的授权按钮。下面是待实现流程：
-
-1. Alice 从“共享 Codex”发起首次设置，浏览器生成共享认证加密 key 并保存为 Secret，再在她本人的唯一 runner 中执行官方 device-auth。
-2. 同一 runner 的 managed-auth 进程取得完整认证，由认证模块加密提交到执行仓库 `auth-state` 分支的 `codex.enc`。提交成功才显示共享成功。
-3. Bob、Carol 从使用页启动各自的 Codex 环境，不再各自授权。聊天进程只接收 access token；完整认证和 refresh token 归账号认证模块管理。
-4. 接近过期时，在现有 runner 内获取账号锁，启动短暂 managed-auth 进程刷新，再保存新的完整认证。只有提交确认后才发放新 token。正常续期不需要 Alice 在线。
-
-官方外部 token 协议的适配和真实并发刷新验证仍待完成。不能直接把完整 `auth.json` 同时复制给所有聊天进程，也不能用逐成员授权替代这条流程。
 
 ## 使用团队账号：Bob 使用 Alice 已共享的账号
 
@@ -81,23 +69,23 @@ metadata:
 
 折叠的“运行详情”中仍可单独“检查运行环境”，仅报告共享凭据是否存在，详情在 Actions 查看；它不启动 Agent / Morty，也不验证凭据可用性。其他入口不会出现本人的聊天控件。
 
-待实现的连续会话：浏览器为本人持有独立 historyKey，将其加密交付给经过核验的个人 runner；只恢复本人的历史、文件与 Morty 身份。保存时先停止写入，再加密归档到本人 cache。没有恢复包、导出或跨设备迁移；清理浏览器数据会丢失旧历史的解密能力，解密失败不得以空历史覆盖旧归档。Codex 聊天还需完成独立的共享认证适配。
+待实现的连续会话：浏览器为本人持有独立 historyKey，将其加密交付给经过核验的个人 runner；只恢复本人的历史、文件与 Morty 身份。保存时先停止写入，再加密归档到本人 cache。没有恢复包、导出或跨设备迁移；清理浏览器数据会丢失旧历史的解密能力，解密失败不得以空历史覆盖旧归档。
 
 ## 失效与停止共享
 
-Claude CI token 失效或 Codex 无法自动刷新时，只提示账号提供者回到对应共享入口重新授权。正常刷新不应变成新成员的登录流程，个人历史也不随共享账号重登而重置。
+Claude CI token 失效时，只提示账号提供者回到对应共享入口重新授权。正常刷新不应变成新成员的登录流程，个人历史也不随共享账号重登而重置。
 
-目前停止共享需管理员在 GitHub 删除对应 Secret；未来 Codex 还须停用认证状态并停止相关活跃任务。收回已经注入 runner 的凭据须在模型服务方撤销或轮换，单独删除 Secret 无法做到。首版不提供逐成员撤销。
+目前停止共享需管理员在 GitHub 删除对应 Secret。收回已经注入 runner 的凭据须在模型服务方撤销或轮换，单独删除 Secret 无法做到。首版不提供逐成员撤销。
 
 ## 验收边界
 
 自动集成验收覆盖独立入口、切换后继续 Claude 密文授权、取消后返回共享设置、共享失败重试、跨入口单 runner 限制，以及重新连接时旧响应不能覆盖新环境。外部替身并不证明真实 OAuth 或多人刷新行为。
 
-完整产品还需验证：Alice 共享后离线，Bob / Carol 能并发聊天，各自只有一个 runner，历史互不读取或覆盖；同浏览器重启能继续；Codex 一次授权、自动刷新回写且不并发旋转同一 refresh token。未完成项不按已交付能力描述。
+完整产品还需验证：Alice 共享后离线，Bob / Carol 能并发聊天，各自只有一个 runner，历史互不读取或覆盖；同浏览器重启能继续。未完成项不按已交付能力描述。
 
 
 当前真实验证已完成两次本人 Claude / Morty 启动：网页发送消息、一次终端工具授权与文件读写、收到回复；修正后的任务正常停止、自动关闭 Issue，Morty 变为离线。正式入口为 [shared-morty](https://taowen-paraflow.github.io/shared-morty/)。页面加载及发布构建一致性已验证；认证后的完整流程使用相同构建的本地测试入口，不能因此声称已验证另一位成员或多人并发。详见 [实验记录](./experiments/personal-chat-results.json)。
 
-2026-11-13 刷新恢复实测：[run 43376282942](https://github.com/taowen-paraflow/shared-morty/actions/runs/43376282942)，源码 4b75b48。真实 Chromium 自动显示就绪；整页刷新后 GitHub 自动重连、原生 CryptoKey 恢复，解密得到同一会话入口；在 Morty 收到合成消息的预期回复。正常停止后刷新确认终态，Actions success、Issue 6 自动关闭、cleaned_up、Morty Offline。公开日志和评论的凭据 / transfer / OAuth code / PKCE / 合成聊天文本定向扫描均未命中。另一真实 actor 的 run 43373788316 同时仍在运行，未被本次控制；这不代表已验证双方聊天数据隔离。认证测试用同一构建的 localhost 一次性 GitHub bootstrap；未测试浏览器进程重启、跨站点迁移、归档或 Codex。记录见 `experiments/personal-chat-results.json` 的 refreshRecovery。
+2026-11-13 刷新恢复实测：[run 43376282942](https://github.com/taowen-paraflow/shared-morty/actions/runs/43376282942)，源码 4b75b48。真实 Chromium 自动显示就绪；整页刷新后 GitHub 自动重连、原生 CryptoKey 恢复，解密得到同一会话入口；在 Morty 收到合成消息的预期回复。正常停止后刷新确认终态，Actions success、Issue 6 自动关闭、cleaned_up、Morty Offline。公开日志和评论的凭据 / transfer / OAuth code / PKCE / 合成聊天文本定向扫描均未命中。另一真实 actor 的 run 43373788316 同时仍在运行，未被本次控制；这不代表已验证双方聊天数据隔离。认证测试用同一构建的 localhost 一次性 GitHub bootstrap；未测试浏览器进程重启、跨站点迁移、归档。记录见 `experiments/personal-chat-results.json` 的 refreshRecovery。
 
 Token 引导修正：GitHub 官方当前不支持 repository / outside collaborator 使用 fine-grained Token。个人账号 taowen-paraflow 的仓库协作者 taowen 应用本人的 classic Token；不能将 taowen-paraflow 强行作为其 fine-grained Resource owner，也不共享所有者的 GitHub Token。taowen 的写权限已由真实 API 确认；真实聊天 run 43376282942 的 actor 也是 taowen。该证据来自现有 classic 凭据，不代表已经验证新 Token 的签发。引导测试只验证链接和可见说明，不模拟 GitHub 发证策略。[Token 限制](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#fine-grained-personal-access-tokens-limitations)；[dispatch 的 classic repo scope 要求](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event)。
