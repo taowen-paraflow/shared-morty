@@ -73,8 +73,8 @@ test("Given an owner's pending login, when she cancels, then the launcher reques
     }
 });
 
-test("Given an owner, when she authorizes Claude and shares it, then only encrypted messages and the sealed repository secret leave her page", async () => {
-    const github = await loginGitHubServer();
+test("Given an owner in a public repository, when she authorizes Claude and shares it, then only encrypted messages and the sealed repository secret leave her page", async () => {
+    const github = await loginGitHubServer({ private: false });
     const root = document.createElement("main");
     document.body.append(root);
     const unmount = mountLauncher(root, { apiOrigin: github.origin });

@@ -16,7 +16,7 @@ export type ErrorCode =
 
 const messages: Readonly<Record<ErrorCode, string>> = {
     provider_failed: "Claude 登录未成功，请返回环境后重新授权。",
-    unsafe_execution: "执行环境校验失败：需要私有仓库、默认分支和可验证的本人 workflow 任务。",
+    unsafe_execution: "执行环境校验失败：需要默认分支和可验证的本人 workflow 任务。",
     runner_busy: "你已有尚未结束的 runner，请刷新状态或处理现有任务。",
     conflict: "GitHub 未接受操作，任务可能已结束或 workflow 配置不匹配，请刷新状态。",
     invalid_input: "请检查执行仓库、Token 和请求参数。",

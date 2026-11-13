@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test, vi } from "vitest";
 import { beginClaudeLogin, refreshClaudeLogin, sendClaudeCode } from "../src/launcher/claude-login.ts";
 import { runClaudeLogin } from "../src/runner/claude-login.ts";
+import type { Diagnostic } from "../src/shared/diagnostics.ts";
 import { GitHubClient } from "../src/shared/github.ts";
 import { loginGitHubServer } from "./support/login-github.ts";
 
@@ -15,6 +16,7 @@ test.each(["authorized", "invalid_code", "replayed_code", "cancelled"])(
         process.env.UNRELATED_SECRET = "synthetic-secret-must-not-reach-provider";
         const lifetime = new AbortController();
         let now = Date.now();
+        const diagnostics: Diagnostic[] = [];
         let tick: (() => void) | undefined;
         let notifyWaiting: (() => void) | undefined;
         const waiting = new Promise<void>((resolve) => {
@@ -37,6 +39,9 @@ test.each(["authorized", "invalid_code", "replayed_code", "cancelled"])(
                 },
                 lifetime.signal,
                 {
+                    diagnostic: (record) => {
+                        diagnostics.push(record);
+                    },
                     clock: {
                         now: () => now,
                         wait: (_milliseconds, signal) =>
@@ -93,6 +98,14 @@ test.each(["authorized", "invalid_code", "replayed_code", "cancelled"])(
             expect(github.messages()).not.toContain(github.token);
             expect(github.messages()).not.toContain(github.authorizationCode);
             expect(github.messages()).not.toContain(github.authorizationUrl);
+            const log = JSON.stringify(diagnostics);
+            expect(log).toContain('"event":"terminal.output"');
+            expect(log).toContain('"event":"terminal.exit"');
+            expect(log).not.toContain(github.token);
+            expect(log).not.toContain(github.authorizationCode);
+            expect(log).not.toContain(github.authorizationUrl);
+            expect(log).not.toContain("fixture-sensitive-state");
+            expect(log).not.toContain("synthetic-secret-must-not-reach-provider");
         } finally {
             if (previousSecret === undefined) delete process.env.UNRELATED_SECRET;
             else process.env.UNRELATED_SECRET = previousSecret;

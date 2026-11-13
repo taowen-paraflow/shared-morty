@@ -13,7 +13,7 @@ const requestId = "bb46c601-ae8e-4882-bbb8-020051ecde1a";
 
 test.each([
     { privateRepository: true, actor: "42", ref: "refs/heads/main", accepted: true },
-    { privateRepository: false, actor: "42", ref: "refs/heads/main", accepted: false },
+    { privateRepository: false, actor: "42", ref: "refs/heads/main", accepted: true },
     { privateRepository: true, actor: "99", ref: "refs/heads/main", accepted: false },
     { privateRepository: true, actor: "42", ref: "refs/heads/untrusted", accepted: false },
 ])(
@@ -37,6 +37,7 @@ test.each([
                     GITHUB_REF: ref,
                     SHARED_CLAUDE_AVAILABLE: "true",
                     SHARED_CODEX_AVAILABLE: "false",
+                    SHARED_MORTY_DIAGNOSTICS: "1",
                 },
                 timeout: 10_000,
             });
@@ -51,6 +52,7 @@ test.each([
                     chat: "not_implemented",
                 });
                 expect(result.stdout + result.stderr).not.toContain("fixture-token");
+                expect(result.stderr).toContain('"event":"github.response"');
             } else {
                 await expect(operation).rejects.toMatchObject({
                     stderr: expect.stringContaining('"code":"unsafe_execution"'),

@@ -1,3 +1,4 @@
+import { githubResource, writeDiagnostic } from "./diagnostics.ts";
 import { AppError } from "./errors.ts";
 
 const API_ORIGIN = "https://api.github.com";
@@ -59,7 +60,7 @@ export class GitHubHttp {
         pathname: string,
         signal: AbortSignal,
         body?: Readonly<Record<string, unknown>>,
-        method = body === undefined ? "GET" : "POST",
+        method: "GET" | "POST" | "PUT" | "PATCH" = body === undefined ? "GET" : "POST",
     ): Promise<unknown> => {
         if (signal.aborted) throw new AppError("cancelled", signal.reason);
         const deadline = new AbortController();
@@ -77,6 +78,12 @@ export class GitHubHttp {
                 },
                 redirect: "error",
                 signal: combined,
+            });
+            writeDiagnostic({
+                event: "github.response",
+                method,
+                resource: githubResource(pathname),
+                status: response.status,
             });
             if (!response.ok) {
                 await response.body?.cancel();

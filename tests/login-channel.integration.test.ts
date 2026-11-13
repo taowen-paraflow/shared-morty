@@ -4,17 +4,18 @@ import { GitHubClient } from "../src/shared/github.ts";
 import { LOGIN_LIFETIME_MS } from "../src/shared/login-protocol.ts";
 import { loginGitHubServer } from "./support/login-github.ts";
 
-test("Given a public execution repository, when the owner begins a login, then no authorization channel is created", async () => {
+test("Given a public execution repository, when the owner begins a login, then only public metadata and encrypted challenges enter its issue", async () => {
     const github = await loginGitHubServer({ private: false });
+    const client = new GitHubClient("fixture-token", github.origin);
+    const signal = new AbortController().signal;
     try {
-        await expect(
-            beginClaudeLogin(
-                new GitHubClient("fixture-token", github.origin),
-                "team/execution",
-                new AbortController().signal,
-            ),
-        ).rejects.toMatchObject({ code: "unsafe_execution" });
-        expect(github.messages()).toBe(JSON.stringify({ requestBody: "", comments: [] }));
+        const state = await beginClaudeLogin(client, "team/execution", signal);
+        expect(state.kind).toBe("waiting");
+        await github.publishChallenge();
+        expect(await refreshClaudeLogin(client, state, signal)).toMatchObject({ kind: "authorizing" });
+        expect(github.messages()).not.toContain(github.authorizationUrl);
+        expect(github.messages()).not.toContain(github.authorizationCode);
+        expect(github.messages()).not.toContain(github.token);
     } finally {
         await github.close();
     }

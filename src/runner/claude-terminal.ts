@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import xterm from "@xterm/headless";
 import * as v from "valibot";
 import { withDeadline } from "../shared/async.ts";
+import { type DiagnosticSink, observeTerminal, writeDiagnostic } from "../shared/diagnostics.ts";
 import { AppError } from "../shared/errors.ts";
 import { authorizationUrl, codeSchema } from "../shared/login-protocol.ts";
 
@@ -12,6 +13,7 @@ export interface TerminalOptions {
     readonly env: Readonly<NodeJS.ProcessEnv>;
     readonly cwd: string;
     readonly transport: "pty" | "pipe";
+    readonly diagnostic?: DiagnosticSink;
 }
 
 type ProcessState =
@@ -28,8 +30,11 @@ export class ClaudeTerminal {
     #state: ProcessState = { kind: "running" };
     #rendering: Promise<void> = Promise.resolve();
     #bytes = 0;
+    #lastObservation = "";
+    readonly #diagnostic: DiagnosticSink;
 
     constructor(options: TerminalOptions) {
+        this.#diagnostic = options.diagnostic ?? writeDiagnostic;
         const shell = `stty cols 1000 rows 80; exec ${[options.command, ...options.args].map(quote).join(" ")}`;
         try {
             this.#child =
@@ -47,7 +52,8 @@ export class ClaudeTerminal {
                 this.#changes.emit("change");
                 resolve();
             });
-            this.#child.once("close", () => {
+            this.#child.once("close", (code, signal) => {
+                this.#diagnostic({ event: "terminal.exit", code, signal, totalBytes: this.#bytes });
                 void this.#rendering.finally(() => {
                     if (this.#state.kind === "running") this.#state = { kind: "closed" };
                     this.#changes.emit("change");
@@ -55,7 +61,7 @@ export class ClaudeTerminal {
                 });
             });
         });
-        const consume = (chunk: Buffer) => {
+        const consume = (stream: "stdout" | "stderr") => (chunk: Buffer) => {
             this.#bytes += chunk.byteLength;
             if (this.#bytes > 2_000_000) {
                 this.#state = { kind: "failed", error: new AppError("provider_failed") };
@@ -67,14 +73,32 @@ export class ClaudeTerminal {
                 () =>
                     new Promise<void>((resolve) => {
                         this.#screen.write(chunk, () => {
+                            const screen = observeTerminal(this.#text());
+                            const signature = JSON.stringify(screen);
+                            if (signature !== this.#lastObservation) {
+                                this.#lastObservation = signature;
+                                this.#diagnostic({
+                                    event: "terminal.output",
+                                    stream,
+                                    bytes: chunk.byteLength,
+                                    totalBytes: this.#bytes,
+                                    screen,
+                                });
+                            }
                             this.#changes.emit("change");
                             resolve();
                         });
                     }),
             );
         };
-        this.#child.stdout.on("data", consume);
-        this.#child.stderr.on("data", consume);
+        this.#child.stdout.on("data", consume("stdout"));
+        this.#child.stderr.on("data", consume("stderr"));
+        this.#diagnostic({
+            event: "terminal.started",
+            transport: options.transport,
+            columns: 1000,
+            rows: 80,
+        });
     }
 
     readonly #text = (): string => {
@@ -132,23 +156,32 @@ export class ClaudeTerminal {
         const parsed = v.safeParse(codeSchema, { code });
         if (!parsed.success) throw new AppError("invalid_input");
         if (signal.aborted) throw new AppError("cancelled", signal.reason);
+        this.#diagnostic({ event: "terminal.input", kind: "authorization_code", characters: code.length });
         this.#child.stdin.write(code);
         await withDeadline(10_000, signal, (inputSignal) =>
             this.#find((text) => (text.replaceAll("\n", "").includes(code) ? true : undefined), inputSignal),
         );
+        this.#diagnostic({ event: "terminal.input_echo", matched: true });
+        this.#diagnostic({ event: "terminal.input", kind: "enter", characters: 1 });
         this.#child.stdin.write("\r");
         return this.#find((text) => {
-            if (/OAuth error|[Ii]nvalid (?:code|grant)/u.test(text)) throw new AppError("provider_failed");
+            if (/OAuth error|[Ii]nvalid (?:code|grant)/u.test(text)) {
+                this.#diagnostic({ event: "terminal.outcome", kind: "provider_error", characters: 0 });
+                throw new AppError("provider_failed");
+            }
             const lines = text.split("\n");
             const start = lines.findIndex((line) => line.includes("valid for 1 year"));
             const end = lines.findIndex((line, index) => index > start && line.includes("Store this token"));
             if (start < 0 || end < 0) return undefined;
-            return /sk-ant-oat01-[A-Za-z0-9_-]{20,2048}/u.exec(
+            const token = /sk-ant-oat01-[A-Za-z0-9_-]{20,2048}/u.exec(
                 lines
                     .slice(start + 1, end)
                     .map((line) => line.trim())
                     .join(""),
             )?.[0];
+            if (token)
+                this.#diagnostic({ event: "terminal.outcome", kind: "token", characters: token.length });
+            return token;
         }, signal);
     };
 

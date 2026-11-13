@@ -37,7 +37,7 @@ export class LoginGitHub {
             await this.#http.get(`/repos/${this.#repository}`, signal),
         );
         if (!parsed.success) throw new AppError("invalid_response");
-        if (!parsed.output.private || parsed.output.full_name.toLowerCase() !== this.#repository)
+        if (parsed.output.full_name.toLowerCase() !== this.#repository)
             throw new AppError("unsafe_execution");
         return parsed.output;
     };

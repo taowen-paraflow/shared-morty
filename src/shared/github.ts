@@ -105,7 +105,6 @@ export class GitHubClient {
         );
         if (!repository.success || !run.success) throw new AppError("invalid_response");
         if (
-            !repository.output.private ||
             repository.output.full_name.toLowerCase() !== name ||
             input.ref !== `refs/heads/${repository.output.default_branch}` ||
             run.output.head_branch !== repository.output.default_branch ||
