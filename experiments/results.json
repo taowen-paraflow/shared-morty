@@ -1,0 +1,262 @@
+{
+  "date": "2026-11-13",
+  "repository": "taowen-paraflow/shared-morty",
+  "sourceCommit": "1ce41065fd94c8bdec8dff1b7e70f4d47f0b877d",
+  "finalRun": {
+    "conclusion": "success",
+    "databaseId": 43332500847,
+    "headSha": "1ce41065fd94c8bdec8dff1b7e70f4d47f0b877d",
+    "status": "completed",
+    "url": "https://github.com/taowen-paraflow/shared-morty/actions/runs/43332500847"
+  },
+  "jobs": [
+    {
+      "id": 131580401111,
+      "name": "cache-save (alice)",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580401402,
+      "name": "cache-save (bob)",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580401426,
+      "name": "initialize",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580401531,
+      "name": "codex-real-binary",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580401532,
+      "name": "user-slots (other-group, simulated-other-user)",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580401606,
+      "name": "user-slots (same-user-second, actual-actor)",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580402484,
+      "name": "user-slots (same-user-first, actual-actor)",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580462961,
+      "name": "cache-restore (bob)",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580463071,
+      "name": "cache-restore (alice)",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580463781,
+      "name": "lock-contender (three)",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580463803,
+      "name": "lock-contender (one)",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580463897,
+      "name": "lock-contender (two)",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580634588,
+      "name": "verify-lock-and-recovery",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580712844,
+      "name": "crash-after-intent",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580786167,
+      "name": "recover-after-crash",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580836380,
+      "name": "verify-user-slots",
+      "conclusion": "success"
+    },
+    {
+      "id": 131580912848,
+      "name": "cleanup",
+      "conclusion": "success"
+    }
+  ],
+  "observations": [
+    {
+      "job": "initialize",
+      "jobId": 131580401426,
+      "events": [
+        {
+          "experiment": "bootstrap-with-job-token",
+          "branch": "sm-exp-state-43332500847-1",
+          "contentsWrite": true,
+          "usesRealCredentials": false
+        }
+      ]
+    },
+    {
+      "job": "codex-real-binary",
+      "jobId": 131580401531,
+      "events": [
+        {
+          "codexVersion": "0.154.0",
+          "results": [
+            {
+              "test": "managed-auth-read-forces-refresh-and-persists",
+              "passed": true,
+              "refreshCalls": 1,
+              "persistedAfterProcessExit": true
+            },
+            {
+              "test": "external-auth-accepts-access-token-without-refresh-token",
+              "passed": true,
+              "nativeRefreshCalls": 0,
+              "authFileExists": false
+            },
+            {
+              "test": "external-auth-401-host-callback-and-retry",
+              "passed": true,
+              "callbacks": 1,
+              "modelRequests": 2,
+              "modelServer": "localhost fixture"
+            }
+          ],
+          "endpoint": "localhost-only OAuth fixture",
+          "limitations": "Real binary and file writes, synthetic OAuth/model server. Does not prove real account acceptance, multi-user OAuth policy, callback timeout behavior, or Morty integration."
+        }
+      ]
+    },
+    {
+      "job": "lock-contender (three)",
+      "jobId": 131580463781,
+      "events": [
+        {
+          "experiment": "parallel-ref-lock",
+          "subject": "three",
+          "conflicts": 0,
+          "action": "refreshed",
+          "staleWriteStatus": 409,
+          "readBackConfirmed": true
+        }
+      ]
+    },
+    {
+      "job": "lock-contender (one)",
+      "jobId": 131580463803,
+      "events": [
+        {
+          "experiment": "parallel-ref-lock",
+          "subject": "one",
+          "conflicts": 6,
+          "action": "reused-new-token"
+        }
+      ]
+    },
+    {
+      "job": "lock-contender (two)",
+      "jobId": 131580463897,
+      "events": [
+        {
+          "experiment": "parallel-ref-lock",
+          "subject": "two",
+          "conflicts": 7,
+          "action": "reused-new-token"
+        }
+      ]
+    },
+    {
+      "job": "recover-after-crash",
+      "jobId": 131580786167,
+      "events": [
+        {
+          "experiment": "cross-job-real-crash-recovery",
+          "previousJob": "crash-after-intent",
+          "previousJobStatus": "completed",
+          "persistedMarker": "refreshing",
+          "finalState": "reauth_required",
+          "repeatedRefreshes": 0,
+          "realProcessExit": true
+        }
+      ]
+    },
+    {
+      "job": "verify-user-slots",
+      "jobId": 131580836380,
+      "events": [
+        {
+          "experiment": "user-concurrency-observation",
+          "results": [
+            {
+              "subject": "other-group",
+              "actorId": "40541",
+              "start": 1794527569885,
+              "end": 1794527587901
+            },
+            {
+              "subject": "same-user-first",
+              "actorId": "40541",
+              "start": 1794527603774,
+              "end": 1794527621775
+            },
+            {
+              "subject": "same-user-second",
+              "actorId": "40541",
+              "start": 1794527569203,
+              "end": 1794527587221
+            }
+          ],
+          "sameGroupSerialized": true,
+          "differentGroupOverlapped": true,
+          "limitation": "Only one real GitHub actor is available. The other user is a synthetic group key, not a second authenticated account."
+        }
+      ]
+    }
+  ],
+  "earlierRuns": [
+    {
+      "conclusion": "success",
+      "databaseId": 43331759502,
+      "headSha": "3b44a67be12fda57484d0c32796060f5d9a063d2",
+      "status": "completed",
+      "url": "https://github.com/taowen-paraflow/shared-morty/actions/runs/43331759502"
+    },
+    {
+      "conclusion": "failure",
+      "databaseId": 43332045810,
+      "headSha": "e84ee021fccddb2cf8f6b92138ed2dde52bcdf62",
+      "status": "completed",
+      "url": "https://github.com/taowen-paraflow/shared-morty/actions/runs/43332045810"
+    },
+    {
+      "conclusion": "failure",
+      "databaseId": 43332298000,
+      "headSha": "ceff7eda0e7a1840cc674a43818f7b0561818d69",
+      "status": "completed",
+      "url": "https://github.com/taowen-paraflow/shared-morty/actions/runs/43332298000"
+    }
+  ],
+  "earlierFailures": "The 401 fixture initially changed only chatgpt_base_url; model requests still used the default endpoint and synthetic tokens were rejected. The final fixture explicitly configures a local model provider and runs in a loopback-only network namespace.",
+  "cleanup": "All experiment-specific state/lock refs removed; code branch and synthetic caches/artifacts retained.",
+  "limits": [
+    "Only one real GitHub actor; second user simulated as a distinct concurrency key.",
+    "No real OAuth account, shared subscription, Claude login, or Morty adapter tested.",
+    "GitHub state-machine experiments use synthetic refresh results; real Codex protocol behavior is tested separately with a local fixture.",
+    "No real Secrets injection tested; fixture encryption keys are intentionally public synthetic values.",
+    "Refresh callback timeout is not measured."
+  ]
+}
