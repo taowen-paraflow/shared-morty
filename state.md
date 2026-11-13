@@ -9,7 +9,7 @@ metadata:
 
 页面按“使用团队账号”“共享 Claude Code”“共享 Codex”分开，公共连接只核实 GitHub 身份及仓库，不查询 Secrets 或启动任务。功能状态由各页持有，不再使用跨功能的 action union / reducer。连接时默认进入使用页查询本人任务。
 
-当前已实现运行控制：launcher 查询本人任务、向默认分支的 `runner.yml` 提交环境检查、手动刷新、重新核验归属后请求停止本人任务。检查任务使用真实 actor id 的 concurrency group，验证默认分支、run 的 actor / event / workflow / request id，只报告共享 Secret 是否存在后退出，不启动 Agent 或 Morty。`SHARED_AUTH_KEY` 存在不代表 `codex.enc` 已验证可用。
+当前已实现运行控制：launcher 查询本人任务、向默认分支的 `runner.yml` 提交环境检查、自动更新状态、重新核验归属后请求停止本人任务。检查任务使用真实 actor id 的 concurrency group，验证默认分支、run 的 actor / event / workflow / request id，只报告共享 Secret 是否存在后退出，不启动 Agent 或 Morty。`SHARED_AUTH_KEY` 存在不代表 `codex.enc` 已验证可用。
 
 Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${{ github.actor_id }}` concurrency group。浏览器创建本人 Issue 和临时公钥，runner 校验真实 run、actor、默认分支、run attempt、Issue 创建者与 request id 后，在隔离 home 中启动固定版本 `claude setup-token`。授权链接、授权码和结果 token 经 Issue 密文交换；浏览器收到 token 后单独点击共享，使用仓库公钥的 LibSodium sealed box 写 `SHARED_CLAUDE_TOKEN`。正常完成后关闭 Issue；关闭失败不改写授权结果。账号使用通过独立的 `chat.yml`，不进入此登录流程。
 
@@ -22,11 +22,11 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 | 浏览器连接状态与 Session：PAT HTTP client、规范仓库名、GitHub 身份、连接代号 | `connection.ts` 的 `useConnection`；身份与仓库经 GitHub schema 校验 | 页面连接摘要；三个独立功能读取当前 Session | 内存；输入框立即清空。重连取消旧请求并卸载旧功能；连接代号只用于本地组件生命周期，不作为身份依据 |
 | 连接引导中的仓库名称及 Token 创建链接 | 部署者修改 `launcher/config.ts` 的 defaultRepository；本人在 `ConnectionForm` 修改仓库；`token-guide.ts` 规范化后派生链接 | 本人浏览器、GitHub 官方 Token 表单 | 只含公开仓库名、资源所有者、90 天期限及权限模板；默认 Actions / Issues write，共享模板另含 Secrets write。真实 Token 不写入链接或 React state；此预设不是执行授权依据 |
 | 当前入口：使用 / 共享 Claude / 共享 Codex | `view.tsx` 的 Workspace，由本人导航操作更新 | 导航与对应页面 | 默认使用入口；切换不提交 workflow、不发布凭据；重新连接重置 |
-| 使用页任务快照：loading / ready / stale / working / failed | `use-runner.ts`，只接收本人运行查询与操作结果；`usage-page.tsx` 协调显示 | 使用页及 `RunnerPanel` | 没有本页聊天任务时，进入或返回使用页重新查询；切换只隐藏以保留聊天密钥。stale 禁止凭旧快照启动检查 |
-| 浏览器个人聊天状态：idle / waiting / ready / stopping / stopped / failed，另有 working 包裹前态 | `use-chat.ts` 调用 `launcher/personal-chat.ts`；后者把经 schema、bot id、真实 run / attempt 核验并成功解密的消息归为单一结果联合，失败优先于停止、停止优先于就绪 | `ChatPanel`，不被共享账号页读取 | 仅内存；切换入口保留；重新连接、刷新或关闭后丢失。状态查询失败会撤下旧链接，保留本次密钥供重试 |
+| 使用页统一生命周期：loading / available / chat / syncing / working / offline / failed | `use-environment.ts` 串行调用领域操作，`usage-page.tsx` 只传递状态和事件 | `EnvironmentPanel`；诊断放入折叠的运行详情 | 启动和停止每 5 秒、就绪或空闲每 30 秒查询；暂时失败每 15 秒重试。每次查询结束后再计时，不重叠；用户操作取消旧查询，销毁取消计时和请求 |
+| 浏览器聊天领域状态：waiting（queued / preparing）/ ready / stopping / stopped / failed | `launcher/personal-chat.ts` 解析和核验消息；失败优先于停止、停止优先于就绪；还查询实际 Actions 完成结果，避免无 bot 消息时永久等待 | 统一环境控制器；不被共享账号页读取 | ready URL 仅在内存，查询失败撤下；刷新后使用下述恢复记录重新核验与解密，绝不从本地直接展示旧链接 |
 | Claude 共享页：intro / login / working；login 内为授权协议阶段 | `claude-sharing-page.tsx` 调用登录领域函数写入 | `ClaudeLoginPanel` | 切换入口只隐藏，不卸载，保留授权上下文；失败保留可重试结果；共享或取消后返回本功能设置。使用页不读取此状态 |
 | Codex 共享页 | 当前无业务状态 | 独立说明页 | 尚未实现，不启动授权或读取 Secrets |
-| 浏览器各功能当前请求的 AbortController | `useTask` 按功能独立持有；连接请求由 `useConnection` 持有 | 对应 GitHub / 登录异步操作 | 同一功能同步阻止重复提交；卸载、重连、页面销毁时取消，已取消响应不能写回。切换入口不会取消保留中的 Claude 登录或个人聊天交换；不代表取消已提交的远端任务 |
+| 浏览器各功能当前请求的 AbortController | 共享页由 `useTask` 持有，使用页由 `useEnvironment` 持有；连接请求由 `useConnection` 持有 | 对应 GitHub / 登录异步操作 | 同一功能同步阻止重复提交；卸载、重连、页面销毁时取消，已取消响应不能写回。切换入口不会取消保留中的 Claude 登录或个人聊天交换；不代表取消已提交的远端任务 |
 | workflow dispatch inputs：检查任务的 `mode=check` / `request_id`；登录及聊天任务的 `issue` / `request_id` | launcher | GitHub、对应运行进程 | 不携带凭据、授权码或私钥；提交成功不等于任务已启动 |
 | Actions `GITHUB_EVENT_PATH` 指向的事件 JSON | GitHub | 检查入口；登录 / 聊天通过 `issue-execution.ts` 的 `readIssueExecution` 读取 | 本次 job 临时文件；公共解析只返回 readonly IssueExecution，不授予执行权限；领域入口仍用 job token 核对真实 run |
 | job 环境中的 `GH_TOKEN` | GitHub 注入 job token | 运行进程的 GitHub HTTP client | 检查任务 contents / actions read；登录、聊天任务另有 issues write。均不传给 Claude 子进程，不授予 Secrets 写入 |
@@ -40,13 +40,27 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 | PTY 和 xterm 内存屏幕 | 官方 Claude CLI 输出，运行进程读取 | 登录适配器 | `script` 日志目标为 `/dev/null`，stdout / stderr 不转发到 Actions 日志；等待授权码明文或“星号遮罩 + 末尾六字符”在屏幕确认后才发送 Enter；不按任意日志文本提取凭据 |
 | 仓库 Secret `SHARED_CLAUDE_TOKEN` | 本人 launcher 在显式点击共享后通过 PUT 写入或替换 | 后续 Claude 任务由 GitHub 注入 | 传输使用 GitHub 公钥 sealed box；只有 HTTP 201 / 204 成功才显示共享成功，权限或网络失败保留本页 token 供重试 |
 
+### 浏览器恢复存储（已实现）
+
+这是浏览器同源存储，不增加服务端数据库或常驻服务。原生 IndexedDB 名称 `shared-morty-browser-v1`、版本 1、object store 为 `vault`，只有 `browser-vault.ts` 读写。文件由浏览器配置目录管理，本项目不指定磁盘路径。存储操作有 8 秒期限，失败阻止启动，避免创建无法恢复的任务。
+
+| 存储 key / 值 | 谁写、何时写 | 谁读 | 清理与边界 |
+| --- | --- | --- | --- |
+| `connection-key`：不可导出的 AES-256-GCM CryptoKey | 首次成功连接时生成，单个 readwrite 事务防止并发覆盖 | `browser-vault.ts` 加解密连接 | 清除网站数据时删除；不是硬件绑定或独立密码保护 |
+| `connection:<API origin>`：v1、IV、AES-GCM 密文 | `useConnection` 核验本人和仓库后保存 `{token,repository,userId}`；AAD 绑定 slot | 刷新时解密，重新请求 GitHub 身份和仓库，身份与保存值不符则拒绝 | 最近连接覆盖旧连接；输入框立即清空；过期 Token 必须重新连接。Token 不传给 runner 或 Morty |
+| `chat:<规范仓库>:<GitHub user id>`：v1、phase、Issue、request、公钥及不可导出 RSA 私钥 | 创建 Issue 后、dispatch 前保存 phase=waiting；核验要停止的 run 后、发送停止指令前保存 phase=stopping | 使用页按远程已核验的本人身份读取；再核对 request owner、公钥、key 类型和 schema | 确认失败 / 停止 / 到期后删除；不保存 ready URL、聊天正文、共享 token 或历史归档 |
+
+恢复顺序：连接密文 → GitHub 重新认证 → 查本人 checkpoint → 读 bot 密文并核验真实 workflow / run / attempt → 解密 → 确认 run 仍活跃、访问未到期 → 显示入口。停止中的 checkpoint 不会因旧 ready 消息重新变成就绪。查询失败隐藏旧入口并保留 checkpoint，自动重试时重新读取它；收到已结束任务也会撤下入口。清除网站数据、换浏览器或换 origin 后无法恢复旧密钥，可以从运行详情停止旧任务再重启。
+
+非导出 CryptoKey 仍可被同源脚本使用；此存储不防同源 XSS、恶意部署代码或浏览器配置文件被接管。请使用自己的浏览器配置文件。Claude 登录交换的私钥和未共享 token **仍仅在内存**，不受聊天恢复机制覆盖。现有 Issue / runner 协议 v1 未改变；旧页面没有 checkpoint 的任务不能事后恢复遗失私钥。
+
 ### 当前个人聊天的文件与状态
 
 `R = $RUNNER_TEMP/shared-morty-<真实 actor id>-chat-<随机后缀>/`。每个 job 使用自己的临时 R，不复用其他用户或上一次任务的 home。当前不保存任何个人 archive / cache；以下 R 是实际临时布局，后文 U / T 与历史归档仍是待实现设计。
 
 | 状态 / 文件 | 谁写 | 谁读 | 何时清理 / 提交 |
 | --- | --- | --- | --- |
-| 浏览器本次聊天的不可导出 RSA 私钥、公钥、Issue / request id | launcher 为每次启动生成 | 仅本页 launcher；公钥写入 Issue | 不持久化；切换功能保留，刷新 / 重连丢失；不与 Claude 登录页密钥或未来 historyKey 共用 |
+| 浏览器本次聊天的不可导出 RSA 私钥、公钥、Issue / request id | launcher 每次启动生成，`browser-vault.ts` 在 dispatch 前写入浏览器原生 IndexedDB | 同源 launcher 在远程核验 GitHub 身份后读取；公钥写入 Issue | 切换 / 刷新 / 重连同一身份可恢复；确认终态后删除 checkpoint；不与 Claude 登录页密钥或未来 historyKey 共用 |
 | `shared-morty-chat-<requestId>` Issue 正文 | launcher | 运行主进程 | v1、purpose=claude_chat、真实本人 id、浏览器公钥、request id、1 小时 expiresAt；无凭据；正常结束时主进程关闭 Issue |
 | 聊天 Issue 的 ready / error / stopped comments | 已核验 run 的 job bot | 本次 launcher | 使用现有 RSA-OAEP / AES-GCM 密文；AAD 另外绑定 purpose、仓库、Issue、request、run、attempt、期限。ready 内含 Morty 私人链接和访问到期时间；不写聊天正文 |
 | 聊天 Issue 的 stop comment | 已登录的本人 launcher | 运行主进程每 30 秒查询 | 只有公开的停止意图和绑定字段，无秘密；主进程核对真实 comment author id / User 类型、request、run、attempt、expiresAt 后才接受。其他人的留言无效 |
@@ -57,7 +71,7 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 | 启动子进程 stdout / stderr 缓冲区 | 官方 CLI / Morty CLI | `personal-agent.ts` 经 schema 解析 | 有界缓冲和超时；不转发到 Actions 日志；错误保留内部 cause，用户只见稳定错误码的消息 |
 | Morty 继续链接及浏览器原生设备访问状态 | Morty 服务返回 transfer；launcher 解密后提供链接；Morty 网页消费链接并写原生浏览器状态 | 本人浏览器、Morty / daemon | 链接只通过密文交付，限定 morty.build /continue、claude harness、UUID session；访问时长 1h；不要转发。Morty 原生浏览器数据不由 launcher 加密或管理 |
 
-个人聊天的启动调用顺序为：重新确认本人空闲 → 创建聊天 Issue → dispatch 默认分支 chat.yml → 校验真实执行上下文和 Issue 归属 → 建立 R → 启动官方 Claude seed session → `morty setup --harness claude --session-id … --device-access 1h` → 加密 ready → 持续等待本人 stop 或到期。请求起最多一小时（含排队），不是永久运行环境。Claude 和 Morty 固定为 2.1.323 / 0.4.253；子进程只继承 PATH、隔离目录、终端和运行标记、模型 token，不继承 GitHub PAT、job token 或无关 Secrets。
+个人聊天的启动调用顺序为：重新确认本人空闲 → 创建聊天 Issue → 提交本地恢复 checkpoint → dispatch 默认分支 chat.yml → 校验真实执行上下文和 Issue 归属 → 建立 R → 启动官方 Claude seed session → `morty setup --harness claude --session-id … --device-access 1h` → 加密 ready → 持续等待本人 stop 或到期。请求起最多一小时（含排队），不是永久运行环境。Claude 和 Morty 固定为 2.1.323 / 0.4.253；子进程只继承 PATH、隔离目录、终端和运行标记、模型 token，不继承 GitHub PAT、job token 或无关 Secrets。
 
 正常停止先发送本人 stop 指令，不取消 Actions job；主进程停止 Morty、发送加密 stopped、关闭 Issue、删除 R，然后自然退出。清理操作有各自时限，网络失败仍结束任务，不承诺关闭 Issue 一定成功。超时或异常也执行同一清理。GitHub 取消是强制兜底，可能来不及执行 finally；此时 VM 销毁保证不留运行环境，Issue 可能需要手工关闭，且没有保存历史。
 
@@ -353,3 +367,5 @@ Claude 停用由提供者的 launcher 删除 token Secret。Codex 停用先通�
 修正后的运行 [43370609941](https://github.com/taowen-paraflow/shared-morty/actions/runs/43370609941)（源码 6c9e6ab）再次完成浏览器交接与问答，确认新的工作目录没有上一轮文件。随后从 launcher 发送正常停止：workflow success、Issue 4 自动关闭、主进程记录 cleaned_up、launcher 显示没有运行任务、Morty 页面显示 Offline。公开日志和评论的 token / transfer code / 授权码 / PKCE / 合成聊天文本扫描均未命中；评论为两个密文结果加一个仅含公开绑定字段的本人 stop 指令。这是定向证据，不是保密性的通用证明。
 
 [部署 43370576007](https://github.com/taowen-paraflow/shared-morty/actions/runs/43370576007) 已发布 [永久 launcher](https://taowen-paraflow.github.io/shared-morty/)，浏览器确认能加载，HTML / JS / CSS hash 与实测构建一致。真实认证流程使用同一构建的临时 localhost 页面和一次性本机 GitHub 连接 bootstrap；没有另行在公网表单填 PAT。仅使用一个真实 GitHub 成员顺序运行；未验证两名真实成员并发、历史持久化或 Codex。机器可读记录见 [personal-chat-results.json](./experiments/personal-chat-results.json)。
+
+2026-11-13 刷新恢复实测：[run 43376282942](https://github.com/taowen-paraflow/shared-morty/actions/runs/43376282942)，源码 4b75b48。真实 Chromium 自动显示就绪；整页刷新后 GitHub 自动重连、原生 CryptoKey 恢复，解密得到同一会话入口；在 Morty 收到合成消息的预期回复。正常停止后刷新确认终态，Actions success、Issue 6 自动关闭、cleaned_up、Morty Offline。公开日志和评论的凭据 / transfer / OAuth code / PKCE / 合成聊天文本定向扫描均未命中。另一真实 actor 的 run 43373788316 同时仍在运行，未被本次控制；这不代表已验证双方聊天数据隔离。认证测试用同一构建的 localhost 一次性 GitHub bootstrap；未测试浏览器进程重启、跨站点迁移、归档或 Codex。记录见 `experiments/personal-chat-results.json` 的 refreshRecovery。
