@@ -32,7 +32,7 @@ function Workspace({ session, lifetime }: { readonly session: Session; readonly 
                     共享 Codex
                 </button>
             </nav>
-            {page === "use" && <UsagePage session={session} lifetime={lifetime} />}
+            <UsagePage session={session} lifetime={lifetime} hidden={page !== "use"} />
             <ClaudeSharingPage session={session} lifetime={lifetime} hidden={page !== "share_claude"} />
             {page === "share_codex" && (
                 <section role="status" aria-live="polite">

@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { ChatGitHub } from "./chat-github.ts";
 import { AppError } from "./errors.ts";
 import { GitHubHttp } from "./github-http.ts";
 import {
@@ -25,6 +26,9 @@ export class GitHubClient {
     constructor(token: string, origin?: string) {
         this.#http = new GitHubHttp(token, origin);
     }
+
+    readonly chatChannel = (repository: string): ChatGitHub =>
+        new ChatGitHub(this.#http, repositoryName(repository));
 
     readonly loginChannel = (repository: string): LoginGitHub =>
         new LoginGitHub(this.#http, repositoryName(repository));
@@ -67,7 +71,8 @@ export class GitHubClient {
                     String(run.actor?.id) === user.id &&
                     run.display_title.startsWith(`shared-morty-${user.id}-`) &&
                     (workflow === ".github/workflows/runner.yml" ||
-                        workflow === ".github/workflows/login.yml") &&
+                        workflow === ".github/workflows/login.yml" ||
+                        workflow === ".github/workflows/chat.yml") &&
                     run.status !== "completed"
                 ) {
                     runs.set(run.id, {
@@ -106,7 +111,7 @@ export class GitHubClient {
             readonly userId: string;
             readonly ref: string;
             readonly requestId: string;
-            readonly workflow?: "runner" | "login";
+            readonly workflow?: "runner" | "login" | "chat";
             readonly attempt?: number;
         },
         signal: AbortSignal,

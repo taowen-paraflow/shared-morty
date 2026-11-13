@@ -1,4 +1,7 @@
 export type ErrorCode =
+    | "agent_failed"
+    | "shared_credential_missing"
+    | "morty_unavailable"
     | "provider_failed"
     | "unsafe_execution"
     | "runner_busy"
@@ -15,6 +18,9 @@ export type ErrorCode =
     | "timeout";
 
 const messages: Readonly<Record<ErrorCode, string>> = {
+    agent_failed: "Claude 未能启动，请查看运行状态；若共享登录态失效，请账号提供者重新共享。",
+    shared_credential_missing: "此仓库尚未共享 Claude 账号，请账号提供者先完成共享。",
+    morty_unavailable: "Morty 暂时无法连接，请停止此任务后重试。",
     provider_failed: "Claude 登录未成功，请返回共享设置后重新授权。",
     unsafe_execution: "执行环境校验失败：需要默认分支和可验证的本人 workflow 任务。",
     runner_busy: "你已有尚未结束的 runner，请刷新状态或处理现有任务。",

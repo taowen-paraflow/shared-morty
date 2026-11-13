@@ -2,6 +2,7 @@ import { EventEmitter, once } from "node:events";
 import { createServer, type IncomingMessage } from "node:http";
 import sodium from "libsodium-wrappers";
 import * as v from "valibot";
+import { chatMessageSchema } from "../../src/shared/chat-protocol.ts";
 import { createLoginKey, fromBase64, open, seal, toBase64 } from "../../src/shared/login-crypto.ts";
 import {
     ACTIONS_BOT_ID,
@@ -29,7 +30,10 @@ async function body(request: IncomingMessage): Promise<unknown> {
     return parseJson(result);
 }
 
-export async function loginGitHubServer(options: { readonly private?: boolean } = {}) {
+export async function loginGitHubServer(
+    options: { readonly private?: boolean; readonly workflow?: "login" | "chat" } = {},
+) {
+    const workflow = options.workflow ?? "login";
     await sodium.ready;
     const secretKey = sodium.crypto_box_keypair();
     const runnerKey = await createLoginKey();
@@ -109,7 +113,7 @@ export async function loginGitHubServer(options: { readonly private?: boolean } 
                     actor: { id: 42 },
                     head_branch: "main",
                     event: "workflow_dispatch",
-                    path: ".github/workflows/login.yml",
+                    path: `.github/workflows/${workflow}.yml`,
                     display_title: `shared-morty-42-${parsed.requestId}`,
                     run_attempt: 1,
                 });
@@ -131,7 +135,7 @@ export async function loginGitHubServer(options: { readonly private?: boolean } 
                                       id: 701,
                                       actor: { id: 42 },
                                       status: "in_progress",
-                                      path: ".github/workflows/login.yml",
+                                      path: `.github/workflows/${workflow}.yml`,
                                       display_title: `shared-morty-42-${parsed.requestId}`,
                                   },
                               ]
@@ -140,7 +144,7 @@ export async function loginGitHubServer(options: { readonly private?: boolean } 
                 return;
             }
             if (
-                url.pathname.endsWith("/actions/workflows/login.yml/dispatches") &&
+                url.pathname.endsWith(`/actions/workflows/${workflow}.yml/dispatches`) &&
                 request.method === "POST"
             ) {
                 const parsed = v.parse(
@@ -173,7 +177,7 @@ export async function loginGitHubServer(options: { readonly private?: boolean } 
                 }
                 send({
                     number: 601,
-                    title: `shared-morty-login-${v.parse(loginRequestSchema, parseJson(requestBody)).requestId}`,
+                    title: `shared-morty-${workflow}-${v.parse(loginRequestSchema, parseJson(requestBody)).requestId}`,
                     body: requestBody,
                     user: { id: 42 },
                     state: "open",
@@ -282,14 +286,22 @@ export async function loginGitHubServer(options: { readonly private?: boolean } 
             sharingAllowed = true;
         },
         sharedToken: () => savedToken,
+        finishRun: () => {
+            runStarted = false;
+        },
         messages: () => JSON.stringify({ requestBody, comments }),
-        waitForMessage: (kind: "challenge" | "code" | "token" | "error") =>
+        waitForMessage: (kind: "challenge" | "code" | "token" | "error" | "ready" | "stopped") =>
             new Promise<void>((resolve) => {
                 const check = () => {
                     if (
                         comments.some((comment) => {
-                            const parsed = v.safeParse(loginMessageSchema, parseJson(comment.body));
-                            return parsed.success && parsed.output.kind === kind;
+                            const data = parseJson(comment.body);
+                            const parsed = v.safeParse(loginMessageSchema, data);
+                            const chat = v.safeParse(chatMessageSchema, data);
+                            return (
+                                (parsed.success && parsed.output.kind === kind) ||
+                                (chat.success && chat.output.kind === kind)
+                            );
                         })
                     ) {
                         events.removeListener("comment", check);

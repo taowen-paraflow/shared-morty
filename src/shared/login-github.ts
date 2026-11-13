@@ -2,33 +2,18 @@ import * as v from "valibot";
 import { AppError } from "./errors.ts";
 import type { GitHubHttp } from "./github-http.ts";
 import { githubRepositorySchema } from "./github-schema.ts";
+import { IssueGitHub } from "./issue-github.ts";
 import { fromBase64, toBase64 } from "./login-crypto.ts";
-import {
-    type LoginMessage,
-    type LoginRequest,
-    loginRequestSchema,
-    parseJson,
-    tokenSchema,
-} from "./login-protocol.ts";
-
-const identifier = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(Number.MAX_SAFE_INTEGER));
-const commentSchema = v.object({
-    id: identifier,
-    body: v.pipe(v.string(), v.maxLength(32_000)),
-    user: v.nullable(v.object({ id: identifier, type: v.string() })),
-});
-export interface LoginComment {
-    readonly id: number;
-    readonly body: string;
-    readonly user: { readonly id: number; readonly type: string } | null;
-}
+import { type LoginMessage, type LoginRequest, loginRequestSchema, tokenSchema } from "./login-protocol.ts";
 
 export class LoginGitHub {
     readonly #http: GitHubHttp;
     readonly #repository: string;
+    readonly #issues: IssueGitHub;
     constructor(http: GitHubHttp, repository: string) {
         this.#http = http;
         this.#repository = repository;
+        this.#issues = new IssueGitHub(http, repository);
     }
 
     readonly settings = async (signal: AbortSignal) => {
@@ -42,18 +27,8 @@ export class LoginGitHub {
         return parsed.output;
     };
 
-    readonly create = async (request: LoginRequest, signal: AbortSignal): Promise<number> => {
-        const parsed = v.safeParse(
-            v.object({ number: identifier }),
-            await this.#http.post(
-                `/repos/${this.#repository}/issues`,
-                { title: `shared-morty-login-${request.requestId}`, body: JSON.stringify(request) },
-                signal,
-            ),
-        );
-        if (!parsed.success) throw new AppError("invalid_response");
-        return parsed.output.number;
-    };
+    readonly create = (request: LoginRequest, signal: AbortSignal): Promise<number> =>
+        this.#issues.create(`shared-morty-login-${request.requestId}`, request, signal);
 
     readonly request = async (
         issue: number,
@@ -61,25 +36,10 @@ export class LoginGitHub {
         requestId: string,
         signal: AbortSignal,
     ): Promise<LoginRequest> => {
-        const parsed = v.safeParse(
-            v.object({
-                title: v.string(),
-                body: v.string(),
-                user: v.nullable(v.object({ id: identifier })),
-                state: v.string(),
-                pull_request: v.optional(v.unknown()),
-            }),
-            await this.#http.get(`/repos/${this.#repository}/issues/${issue}`, signal),
+        const data = v.safeParse(
+            loginRequestSchema,
+            await this.#issues.request(issue, `shared-morty-login-${requestId}`, userId, signal),
         );
-        if (!parsed.success) throw new AppError("invalid_response");
-        if (
-            "pull_request" in parsed.output ||
-            parsed.output.state !== "open" ||
-            String(parsed.output.user?.id) !== userId ||
-            parsed.output.title !== `shared-morty-login-${requestId}`
-        )
-            throw new AppError("forbidden");
-        const data = v.safeParse(loginRequestSchema, parseJson(parsed.output.body));
         if (!data.success || data.output.userId !== userId || data.output.requestId !== requestId)
             throw new AppError("invalid_response");
         return data.output;
@@ -98,34 +58,10 @@ export class LoginGitHub {
         );
     };
 
-    readonly comments = async (issue: number, signal: AbortSignal): Promise<readonly LoginComment[]> => {
-        const comments: LoginComment[] = [];
-        for (let page = 1; page <= 10; page++) {
-            const parsed = v.safeParse(
-                v.pipe(v.array(commentSchema), v.maxLength(100)),
-                await this.#http.get(
-                    `/repos/${this.#repository}/issues/${issue}/comments?per_page=100&page=${page}`,
-                    signal,
-                ),
-            );
-            if (!parsed.success) throw new AppError("invalid_response");
-            comments.push(...parsed.output);
-            if (parsed.output.length < 100) return comments;
-        }
-        throw new AppError("invalid_response");
-    };
-
-    readonly send = async (issue: number, message: LoginMessage, signal: AbortSignal): Promise<void> => {
-        await this.#http.post(
-            `/repos/${this.#repository}/issues/${issue}/comments`,
-            { body: JSON.stringify(message) },
-            signal,
-        );
-    };
-
-    readonly close = async (issue: number, signal: AbortSignal): Promise<void> => {
-        await this.#http.patch(`/repos/${this.#repository}/issues/${issue}`, { state: "closed" }, signal);
-    };
+    readonly comments = (issue: number, signal: AbortSignal) => this.#issues.comments(issue, signal);
+    readonly send = (issue: number, message: LoginMessage, signal: AbortSignal) =>
+        this.#issues.send(issue, message, signal);
+    readonly close = (issue: number, signal: AbortSignal) => this.#issues.close(issue, signal);
 
     readonly publicKey = async (signal: AbortSignal) => {
         const parsed = v.safeParse(

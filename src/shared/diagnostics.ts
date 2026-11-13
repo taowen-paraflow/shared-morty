@@ -21,6 +21,18 @@ export interface TerminalObservation {
 
 export type Diagnostic =
     | {
+          readonly event: "chat.stage";
+          readonly stage:
+              | "execution_verified"
+              | "request_verified"
+              | "starting_agent"
+              | "connecting_morty"
+              | "ready"
+              | "stopped"
+              | "cleaned_up";
+      }
+    | { readonly event: "chat.failed"; readonly code: ErrorCode }
+    | {
           readonly event: "github.response";
           readonly method: "GET" | "POST" | "PUT" | "PATCH";
           readonly resource:
