@@ -7,6 +7,8 @@ metadata:
 
 设计与实现状态，2026-11-13；Claude 登录和共享写入已实现，Codex 共享认证及个人归档尚未实现。本文按“谁持有状态、谁读、谁写、何时提交”组织。用户操作见 [user-journey.md](./user-journey.md)。
 
+页面按“使用团队账号”“共享 Claude Code”“共享 Codex”分开，公共连接只核实 GitHub 身份及仓库，不查询 Secrets 或启动任务。功能状态由各页持有，不再使用跨功能的 action union / reducer。连接时默认进入使用页查询本人任务。
+
 当前已实现运行控制：launcher 查询本人任务、向默认分支的 `runner.yml` 提交环境检查、手动刷新、重新核验归属后请求停止本人任务。检查任务使用真实 actor id 的 concurrency group，验证默认分支、run 的 actor / event / workflow / request id，只报告共享 Secret 是否存在后退出，不启动 Agent 或 Morty。`SHARED_AUTH_KEY` 存在不代表 `codex.enc` 已验证可用。
 
 Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${{ github.actor_id }}` concurrency group。浏览器创建本人 Issue 和临时公钥，runner 校验真实 run、actor、默认分支、run attempt、Issue 创建者与 request id 后，在隔离 home 中启动固定版本 `claude setup-token`。授权链接、授权码和结果 token 经 Issue 密文交换；浏览器收到 token 后单独点击共享，使用仓库公钥的 LibSodium sealed box 写 `SHARED_CLAUDE_TOKEN`。正常完成后关闭 Issue；关闭失败不改写授权结果。尚未接通聊天。
@@ -17,9 +19,12 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 
 | 状态 / 文件 | 谁写 | 谁读 | 生命周期 |
 | --- | --- | --- | --- |
-| 浏览器内存中的 PAT、目标仓库、运行快照、操作结果 | 本人输入、launcher 的 GitHub API 响应 | 本页 launcher | 输入框连接时清空；不写 localStorage / IndexedDB；刷新页面后重新连接 |
-| 浏览器页面状态：连接 / 本人环境 / Claude 登录阶段 / 当前操作编号 | 页面 reducer；领域流程返回经校验的结果 | React JSX 组件 | `working` 保留前一步用于展示和失败恢复；只接受当前操作编号的完成事件。busy 等显示属性从状态推导，不另存一套布尔标记 |
-| 浏览器当前请求的 AbortController | `useLauncher` 创建，重连替换；页面卸载时由 mount 生命周期取消 | GitHub / 登录异步操作 | 操作执行期间同步阻止重复提交；旧请求取消后不能覆盖新连接。属于运行资源，不进入 reducer 或持久存储 |
+| 浏览器连接状态与 Session：PAT HTTP client、规范仓库名、GitHub 身份、连接代号 | `connection.ts` 的 `useConnection`；身份与仓库经 GitHub schema 校验 | 页面连接摘要；三个独立功能读取当前 Session | 内存；输入框立即清空。重连取消旧请求并卸载旧功能；连接代号只用于本地组件生命周期，不作为身份依据 |
+| 当前入口：使用 / 共享 Claude / 共享 Codex | `view.tsx` 的 Workspace，由本人导航操作更新 | 导航与对应页面 | 默认使用入口；切换不提交 workflow、不发布凭据；重新连接重置 |
+| 使用页任务快照：loading / ready / stale / working / failed | `usage-page.tsx`，只接收本人运行查询与操作结果 | 使用页及 `RunnerPanel` | 进入或返回使用页重新查询；离开时卸载并取消未完成请求；stale 禁止凭旧快照启动检查 |
+| Claude 共享页：intro / login / working；login 内为授权协议阶段 | `claude-sharing-page.tsx` 调用登录领域函数写入 | `ClaudeLoginPanel` | 切换入口只隐藏，不卸载，保留授权上下文；失败保留可重试结果；共享或取消后返回本功能设置。使用页不读取此状态 |
+| Codex 共享页 | 当前无业务状态 | 独立说明页 | 尚未实现，不启动授权或读取 Secrets |
+| 浏览器各功能当前请求的 AbortController | `useTask` 按功能独立持有；连接请求由 `useConnection` 持有 | 对应 GitHub / 登录异步操作 | 同一功能同步阻止重复提交；卸载、重连、页面销毁时取消，已取消响应不能写回。切换入口不会取消保留中的 Claude 交换；不代表取消已提交的远端任务 |
 | workflow dispatch inputs：检查任务的 `mode=check` / `request_id`；登录任务的 `issue` / `request_id` | launcher | GitHub、对应运行进程 | 不携带凭据、授权码或私钥；提交成功不等于任务已启动 |
 | Actions `GITHUB_EVENT_PATH` 指向的事件 JSON | GitHub | 检查或登录入口 | 本次 job 临时文件；校验 schema，再用 job token 核对真实 run |
 | job 环境中的 `GH_TOKEN` | GitHub 注入 job token | 运行进程的 GitHub HTTP client | 检查任务 contents / actions read；登录任务另有 issues write。均不传给 Claude 子进程，不授予 Secrets 写入 |
