@@ -2,6 +2,14 @@ name: Shared Claude credential probe
 run-name: shared-morty-${{ github.actor_id }}-shared-probe-${{ github.run_id }}
 on:
     workflow_dispatch:
+        inputs:
+            mode:
+                description: Check authentication only or create one synthetic model turn
+                type: choice
+                options:
+                    - status
+                    - inference
+                default: status
 permissions:
     contents: read
 concurrency:
@@ -23,4 +31,5 @@ jobs:
             - run: npm install --global @anthropic-ai/claude-code@2.1.323
             - run: node experiments/claude-shared-probe.mjs
               env:
+                  PROBE_MODE: ${{ inputs.mode }}
                   SHARED_CLAUDE_TOKEN: ${{ secrets.SHARED_CLAUDE_TOKEN }}
