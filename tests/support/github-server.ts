@@ -17,6 +17,7 @@ export async function githubServer() {
     let authentication: "valid" | "invalid" = "valid";
     let representation: "valid" | "invalid" = "valid";
     let requestListener: (() => void) | undefined;
+    let nextRunResponse: ((deliver: () => void) => void) | undefined;
     const server = createServer(async (request, response) => {
         response.setHeader("content-type", "application/json");
         response.setHeader("access-control-allow-origin", "*");
@@ -113,19 +114,25 @@ export async function githubServer() {
                 return;
             }
             const page = Number(url.searchParams.get("page") ?? "1");
-            response.end(
-                JSON.stringify({
-                    total_count: runs.length,
-                    workflow_runs: runs.slice((page - 1) * 100, page * 100).map((run) => ({
-                        id: run.id,
-                        name: "Shared Morty runner",
-                        display_title: run.name,
-                        status: run.status,
-                        actor: { id: run.actorId, login: run.actorId === 42 ? "alice" : "bob" },
-                        path: run.path ?? ".github/workflows/runner.yml",
-                    })),
-                }),
-            );
+            const payload = JSON.stringify({
+                total_count: runs.length,
+                workflow_runs: runs.slice((page - 1) * 100, page * 100).map((run) => ({
+                    id: run.id,
+                    name: "Shared Morty runner",
+                    display_title: run.name,
+                    status: run.status,
+                    actor: { id: run.actorId, login: run.actorId === 42 ? "alice" : "bob" },
+                    path: run.path ?? ".github/workflows/runner.yml",
+                })),
+            });
+            const deliver = () => response.end(payload);
+            if (nextRunResponse) {
+                const hold = nextRunResponse;
+                nextRunResponse = undefined;
+                hold(deliver);
+                return;
+            }
+            deliver();
             return;
         }
         response.writeHead(404).end(JSON.stringify({ message: "Not found" }));
@@ -152,6 +159,16 @@ export async function githubServer() {
             new Promise<void>((resolve) => {
                 requestListener = resolve;
             }),
+        holdNextRuns: () => {
+            let release = () => {};
+            const received = new Promise<void>((resolve) => {
+                nextRunResponse = (deliver) => {
+                    release = deliver;
+                    resolve();
+                };
+            });
+            return { received, release: () => release() };
+        },
         close: async () => {
             server.closeAllConnections();
             await new Promise<void>((resolve, reject) =>

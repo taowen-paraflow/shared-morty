@@ -1,4 +1,4 @@
-import { mountLauncher } from "./app.ts";
+import { mountLauncher } from "./app.tsx";
 import "./styles.css";
 
 const root = document.querySelector<HTMLElement>("#app");

@@ -1,21 +1,53 @@
 // @vitest-environment happy-dom
 import { fireEvent, getByLabelText, getByRole, queryByRole } from "@testing-library/dom";
 import { expect, test } from "vitest";
-import { mountLauncher } from "../src/launcher/app.ts";
+import { mountLauncher } from "../src/launcher/app.tsx";
 import { loginGitHubServer } from "./support/login-github.ts";
 
 function visible(root: HTMLElement, content: string): Promise<void> {
-    if (root.textContent?.includes(content)) return Promise.resolve();
+    const settled = () =>
+        root.textContent?.includes(content) &&
+        root.querySelector('[role="status"]')?.getAttribute("aria-busy") !== "true";
+    if (settled()) return Promise.resolve();
     return new Promise((resolve) => {
         const observer = new MutationObserver(() => {
-            if (root.textContent?.includes(content)) {
+            if (settled()) {
                 observer.disconnect();
                 resolve();
             }
         });
-        observer.observe(root, { childList: true, subtree: true });
+        observer.observe(root, { childList: true, subtree: true, attributes: true });
     });
 }
+
+test("Given the authorization form has focus, when a malformed code is rejected, then focus stays in the cleared code field", async () => {
+    const github = await loginGitHubServer();
+    const root = document.createElement("main");
+    document.body.append(root);
+    const unmount = mountLauncher(root, { apiOrigin: github.origin });
+    try {
+        fireEvent.input(getByLabelText(root, "执行仓库"), { target: { value: "team/execution" } });
+        fireEvent.input(getByLabelText(root, "GitHub Token"), { target: { value: "fixture-token" } });
+        fireEvent.click(getByRole(root, "button", { name: "连接 GitHub" }));
+        await visible(root, "当前没有运行中的 runner");
+        fireEvent.click(getByRole(root, "button", { name: "登录并共享 Claude" }));
+        await visible(root, "等待登录任务");
+        await github.publishChallenge();
+        fireEvent.click(getByRole(root, "button", { name: "刷新登录状态" }));
+        await visible(root, "在官方页面登录");
+        const input = getByLabelText<HTMLInputElement>(root, "Claude 授权码");
+        input.focus();
+        fireEvent.input(input, { target: { value: "contains spaces" } });
+        fireEvent.click(getByRole(root, "button", { name: "提交授权码" }));
+        await visible(root, "请检查执行仓库、Token 和请求参数。");
+        expect(document.activeElement).toBe(getByLabelText(root, "Claude 授权码"));
+        expect(getByLabelText(root, "Claude 授权码")).toHaveProperty("value", "");
+    } finally {
+        unmount();
+        root.remove();
+        await github.close();
+    }
+});
 
 test("Given an owner's pending login, when she cancels, then the launcher requests cancellation of that login and returns to her runner state", async () => {
     const github = await loginGitHubServer();
