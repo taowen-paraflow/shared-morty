@@ -8,6 +8,7 @@ type TokenGuide =
           readonly name: string;
           readonly useUrl: string;
           readonly shareUrl: string;
+          readonly collaboratorUrl: string;
       };
 
 function tokenUrl(repository: string, owner: string, purpose: "use" | "share"): string {
@@ -31,11 +32,15 @@ export function tokenGuide(value: string): TokenGuide {
     }
     const separator = repository.indexOf("/");
     const owner = repository.slice(0, separator);
+    const collaborator = new URL("https://github.com/settings/tokens/new");
+    collaborator.searchParams.set("description", `shared-morty: ${repository}`);
+    collaborator.searchParams.set("scopes", "repo");
     return {
         kind: "ready",
         owner,
         name: repository.slice(separator + 1),
         useUrl: tokenUrl(repository, owner, "use"),
         shareUrl: tokenUrl(repository, owner, "share"),
+        collaboratorUrl: collaborator.href,
     };
 }

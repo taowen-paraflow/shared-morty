@@ -40,29 +40,50 @@ export function ConnectionForm({ onConnect }: { readonly onConnect: (input: Conn
                         <>
                             <a
                                 className="button-link"
-                                href={guide.useUrl}
+                                href={guide.collaboratorUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
-                                在 GitHub 创建 Token
+                                创建协作者 Token（classic）
                             </a>
                             <p>
-                                新页面已预填 Resource owner：<strong>{guide.owner}</strong>，以及
-                                Actions、Issues 的 Read and write 权限。
+                                仓库属于别人的个人账号？请用你自己的 GitHub 账号创建 classic Token。
+                                新页面预选 repo 权限；选择较短有效期，再点击 Generate token。 此流程不需要选择
+                                Resource owner。
                             </p>
-                            <p>
-                                在 Repository access 选择 <strong>Only select repositories</strong>，再勾选{" "}
-                                <strong>{guide.name}</strong>。保留所需权限，点击 Generate token。
+                            <p className="attention">
+                                classic Token 的 repo
+                                权限不能限定到单个仓库，会覆盖你有权访问的公开和私有仓库。
+                                不要使用或索取仓库所有者的 Token；成员须先接受仓库协作者邀请并拥有写权限。
                             </p>
-                            <details className="sharing-token-guide">
-                                <summary>我要共享自己的账号</summary>
+                            <details className="connection-help">
+                                <summary>我是仓库所有者或组织内部成员</summary>
                                 <p>
-                                    共享自己的 Claude 账号还需要 Secrets 的 Read and write
-                                    权限；仅使用团队账号不需要。
+                                    可以改用权限更细、限定单个仓库的 fine-grained
+                                    Token。仓库协作者和组织外部协作者不适用。
                                 </p>
-                                <a href={guide.shareUrl} target="_blank" rel="noopener noreferrer">
-                                    创建可共享账号的 Token
+                                <a href={guide.useUrl} target="_blank" rel="noopener noreferrer">
+                                    创建 fine-grained Token
                                 </a>
+                                <p>
+                                    新页面已预填 Resource owner：<strong>{guide.owner}</strong>，以及
+                                    Actions、Issues 的 Read and write 权限。
+                                </p>
+                                <p>
+                                    在 Repository access 选择 <strong>Only select repositories</strong>
+                                    ，再勾选 <strong>{guide.name}</strong>。保留所需权限，点击 Generate
+                                    token。
+                                </p>
+                                <details className="sharing-token-guide">
+                                    <summary>我要共享自己的账号</summary>
+                                    <p>
+                                        共享自己的 Claude 账号还需要 Secrets 的 Read and write
+                                        权限；仅使用团队账号不需要。
+                                    </p>
+                                    <a href={guide.shareUrl} target="_blank" rel="noopener noreferrer">
+                                        创建可共享账号的 Token
+                                    </a>
+                                </details>
                             </details>
                         </>
                     ) : (
@@ -71,9 +92,9 @@ export function ConnectionForm({ onConnect }: { readonly onConnect: (input: Conn
                     <details className="connection-help">
                         <summary>找不到仓库或连接失败？</summary>
                         <p>
-                            确认 Resource owner
-                            是仓库所属的用户或组织，并且你有该仓库的写入权限。组织未出现在列表时，请管理员确认你的成员身份和组织的
-                            Token 策略。
+                            如果 GitHub 提示找不到 Resource owner，且你是协作者，请使用上面的 classic Token
+                            入口。 fine-grained Token 只适用于本人仓库或所属组织；组织还可能限制
+                            Token、要求审批或 SSO 授权。
                         </p>
                         <p>
                             如果 Token 显示 Pending，需要管理员批准后才能运行任务。Token
