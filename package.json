@@ -1,0 +1,34 @@
+{
+    "name": "shared-morty",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "license": "MIT",
+    "packageManager": "pnpm@11.25.0",
+    "engines": {
+        "node": ">=24.22.1 <25",
+        "pnpm": "11.25.0"
+    },
+    "scripts": {
+        "dev": "node scripts/dev.ts",
+        "runner": "node src/runner/main.ts",
+        "build": "node scripts/build.ts",
+        "lint": "biome ci --error-on-warnings",
+        "format": "biome check --write .",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "ci:check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    },
+    "dependencies": {
+        "valibot": "1.5.0"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "2.6.7",
+        "@testing-library/dom": "10.4.2",
+        "@types/node": "24.10.1",
+        "esbuild": "0.28.2",
+        "happy-dom": "21.0.4",
+        "typescript": "7.0.2",
+        "vitest": "5.1.0"
+    }
+}

@@ -1,0 +1,81 @@
+:root {
+    font-family: system-ui, sans-serif;
+    color: #182c2a;
+    background: #f4f5ef;
+    font-synthesis: none;
+}
+body {
+    margin: 0;
+}
+main {
+    max-width: 620px;
+    margin: 10vh auto;
+    padding: 32px;
+}
+h1 {
+    font-size: clamp(28px, 5vw, 42px);
+    letter-spacing: -0.04em;
+}
+header p {
+    color: #526661;
+    line-height: 1.7;
+}
+.eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    font-weight: 700;
+}
+form {
+    display: grid;
+    gap: 20px;
+    margin-top: 36px;
+}
+label {
+    display: grid;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+input,
+button {
+    box-sizing: border-box;
+    font: inherit;
+    border-radius: 8px;
+    padding: 13px 16px;
+}
+input {
+    width: 100%;
+    border: 1px solid #9aac9c;
+    background: #fff;
+    color: inherit;
+}
+button {
+    background: #225c49;
+    color: white;
+    border: 0;
+    cursor: pointer;
+    font-weight: 600;
+}
+button:hover {
+    background: #184734;
+}
+input:focus-visible,
+button:focus-visible,
+a:focus-visible {
+    outline: 3px solid #81ad74;
+    outline-offset: 3px;
+}
+.hint {
+    font-size: 12px;
+    color: #526661;
+    margin: -8px 0 0;
+}
+section {
+    margin-top: 28px;
+    line-height: 1.6;
+}
+a {
+    color: #225c49;
+    display: block;
+    margin: 8px 0;
+}

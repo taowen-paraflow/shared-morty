@@ -1,0 +1,38 @@
+export type ErrorCode =
+    | "invalid_input"
+    | "unauthenticated"
+    | "forbidden"
+    | "repository_unavailable"
+    | "rate_limited"
+    | "invalid_response"
+    | "too_many_runs"
+    | "unavailable"
+    | "cancelled"
+    | "timeout";
+
+const messages: Readonly<Record<ErrorCode, string>> = {
+    invalid_input: "请检查执行仓库、Token 和请求参数。",
+    unauthenticated: "GitHub Token 无效或已过期。",
+    forbidden: "当前账号或 Token 没有读取执行仓库的权限。",
+    repository_unavailable: "无法访问执行仓库，请检查仓库名称与读取权限。",
+    rate_limited: "GitHub 请求受限，请稍后重试。",
+    invalid_response: "GitHub 返回了无法验证的数据，未将其视为空环境。",
+    too_many_runs: "运行记录超出本次可验证范围，无法可靠确认当前环境。",
+    unavailable: "暂时无法连接 GitHub，请重试。",
+    cancelled: "请求已取消。",
+    timeout: "连接 GitHub 超时，请重试。",
+};
+
+export class AppError extends Error {
+    readonly code: ErrorCode;
+
+    constructor(code: ErrorCode, cause?: unknown) {
+        super(messages[code], { cause });
+        this.name = "AppError";
+        this.code = code;
+    }
+}
+
+export function publicError(error: unknown): AppError {
+    return error instanceof AppError ? error : new AppError("unavailable", error);
+}
