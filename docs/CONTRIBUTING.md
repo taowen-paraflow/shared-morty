@@ -28,4 +28,6 @@ The login request expires after 15 minutes including Actions queue time. Browser
 
 Cancellation uses GitHub's normal cancellation endpoint and does not save personal data. Acceptance of cancellation or dispatch does not establish completion; refresh to inspect the run. A failed dispatch response may be ambiguous: refresh before retrying. GitHub concurrency prevents two running jobs for one actor; pending tasks may be replaced by GitHub, and there is no fairness guarantee.
 
+The launcher uses React JSX components and a single page reducer. Components describe markup and emit actions; `operations.ts` admits actions for the current phase and invokes the existing domain flows. `useLauncher` owns request cancellation and operation IDs; the reducer ignores results from older operations. Keep network/encryption work out of components and derive pending UI from the state union rather than maintaining parallel loading flags. Secret inputs are uncontrolled refs, cleared on submission, and are not copied into React state.
+
 Before changing behavior, read [Engineering rules](../AGENTS.md), write a failing acceptance scenario, and use [Testing](TESTING.md). Before committing, follow [Code review](CODE_REVIEW.md). Keep Markdown edits in a separate commit from implementation.

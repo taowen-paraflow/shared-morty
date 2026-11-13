@@ -16,6 +16,8 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 | 状态 / 文件 | 谁写 | 谁读 | 生命周期 |
 | --- | --- | --- | --- |
 | 浏览器内存中的 PAT、目标仓库、运行快照、操作结果 | 本人输入、launcher 的 GitHub API 响应 | 本页 launcher | 输入框连接时清空；不写 localStorage / IndexedDB；刷新页面后重新连接 |
+| 浏览器页面状态：连接 / 本人环境 / Claude 登录阶段 / 当前操作编号 | 页面 reducer；领域流程返回经校验的结果 | React JSX 组件 | `working` 保留前一步用于展示和失败恢复；只接受当前操作编号的完成事件。busy 等显示属性从状态推导，不另存一套布尔标记 |
+| 浏览器当前请求的 AbortController | `useLauncher` 创建，重连替换；页面卸载时由 mount 生命周期取消 | GitHub / 登录异步操作 | 操作执行期间同步阻止重复提交；旧请求取消后不能覆盖新连接。属于运行资源，不进入 reducer 或持久存储 |
 | workflow dispatch inputs：检查任务的 `mode=check` / `request_id`；登录任务的 `issue` / `request_id` | launcher | GitHub、对应运行进程 | 不携带凭据、授权码或私钥；提交成功不等于任务已启动 |
 | Actions `GITHUB_EVENT_PATH` 指向的事件 JSON | GitHub | 检查或登录入口 | 本次 job 临时文件；校验 schema，再用 job token 核对真实 run |
 | job 环境中的 `GH_TOKEN` | GitHub 注入 job token | 运行进程的 GitHub HTTP client | 检查任务 contents / actions read；登录任务另有 issues write。均不传给 Claude 子进程，不授予 Secrets 写入 |
