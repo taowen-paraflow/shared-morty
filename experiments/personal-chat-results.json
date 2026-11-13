@@ -1,0 +1,110 @@
+{
+    "date": "2026-11-13",
+    "repository": "taowen-paraflow/shared-morty",
+    "visibility": "public",
+    "versions": {
+        "node": "24.22.1",
+        "claude": "2.1.323",
+        "morty": "0.4.253"
+    },
+    "browser": "Codex in-app Chromium",
+    "firstRun": {
+        "runId": 43369263594,
+        "issue": 3,
+        "sourceSha": "d86b7af2c7aa033059cff18c7caa74d5b07ce9cf",
+        "browserHandoff": true,
+        "modelReplyReceived": true,
+        "terminalPermissionApprovedOnce": true,
+        "terminalToolSucceeded": true,
+        "syntheticAnswerMatched": true,
+        "stopStrategy": "GitHub cancel",
+        "workflowConclusion": "cancelled",
+        "issueRequiredManualClosure": true,
+        "issueState": "closed",
+        "commentKinds": [
+            "ready"
+        ],
+        "secretBearingCommentsEncrypted": true,
+        "stopHasOnlyPublicBindings": true,
+        "logPatternsDetected": {
+            "claudeToken": false,
+            "mortyTransfer": false,
+            "oauthCode": false,
+            "pkceQuery": false,
+            "syntheticChatText": false
+        },
+        "commentPatternsDetected": {
+            "claudeToken": false,
+            "mortyTransfer": false,
+            "oauthCode": false,
+            "pkceQuery": false,
+            "syntheticChatText": false
+        },
+        "cleanupStageObserved": false
+    },
+    "corrections": [
+        "GitHub comments responded with Cache-Control private,max-age=60,s-maxage=60. The initial browser kept showing startup after encrypted ready was posted. Mutable reads now use no-store and a per-read nonce; the HTTP fixture reproduces the cache headers.",
+        "The first GitHub cancellation ended the VM without an encrypted stopped outcome or automatic Issue closure. Normal stop now posts an authenticated control bound to owner/run/attempt; the worker polls and exits itself. Force cancellation remains explicit fallback."
+    ],
+    "verifiedRun": {
+        "runId": 43370609941,
+        "issue": 4,
+        "sourceSha": "6c9e6abea52e12e66cb7e821dae1a1b14a68346d",
+        "browserHandoff": true,
+        "modelReplyReceived": true,
+        "freshWorkspaceCheckPassed": true,
+        "separateWorkspaceAndComputerFromFirstRun": true,
+        "normalStopPostedFromLauncher": true,
+        "workflowConclusion": "success",
+        "launcherReturnedToIdle": true,
+        "mortyBrowserReportedOffline": true,
+        "issueState": "closed",
+        "commentKinds": [
+            "ready",
+            "stop",
+            "stopped"
+        ],
+        "secretBearingCommentsEncrypted": true,
+        "stopHasOnlyPublicBindings": true,
+        "logPatternsDetected": {
+            "claudeToken": false,
+            "mortyTransfer": false,
+            "oauthCode": false,
+            "pkceQuery": false,
+            "syntheticChatText": false
+        },
+        "commentPatternsDetected": {
+            "claudeToken": false,
+            "mortyTransfer": false,
+            "oauthCode": false,
+            "pkceQuery": false,
+            "syntheticChatText": false
+        },
+        "cleanupStageObserved": true
+    },
+    "deployment": {
+        "workflowRunId": 43370576007,
+        "url": "https://taowen-paraflow.github.io/shared-morty/",
+        "sourceSha": "6c9e6abea52e12e66cb7e821dae1a1b14a68346d",
+        "outcome": "success",
+        "browserPageLoaded": true,
+        "deployedAssetsMatchTestedLocalBuild": {
+            "index.html": true,
+            "main.js": true,
+            "main.css": true
+        }
+    },
+    "scope": {
+        "sharedSecretReplaced": false,
+        "providerReauthorizationRequired": false,
+        "databaseAdded": false,
+        "personalArchiveUploaded": false
+    },
+    "limitations": [
+        "Real authenticated launcher flows used the identical built assets on a temporary loopback server with a one-use local GitHub CLI bootstrap; the public deployment was loaded and its asset hashes compared, but its PAT form was not separately authenticated.",
+        "Only one actual GitHub member account was used, sequentially. Different-member permissions and simultaneous accounts were not empirically verified.",
+        "Fresh temporary sessions only: no history encryption/archive/restore or cross-device continuation provided by shared-morty.",
+        "Morty relay and model infrastructure process plaintext; pattern scans supplement typed logging and do not prove universal confidentiality.",
+        "Force cancellation may skip cleanup; one-hour startup deadline includes queue time. Morty browser-native state is separate from launcher state."
+    ]
+}
