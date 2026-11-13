@@ -5,22 +5,34 @@ metadata:
 
 # shared-morty 状态与文件读写约定
 
-设计草案，2026-11-13；共享认证和个人归档尚未实现。本文按“谁持有状态、谁读、谁写、何时提交”组织。用户操作见 [user-journey.md](./user-journey.md)。
+设计与实现状态，2026-11-13；Claude 登录和共享写入已实现，Codex 共享认证及个人归档尚未实现。本文按“谁持有状态、谁读、谁写、何时提交”组织。用户操作见 [user-journey.md](./user-journey.md)。
 
 当前已实现运行控制：launcher 查询本人任务、向默认分支的 `runner.yml` 提交环境检查、手动刷新、重新核验归属后请求停止本人任务。检查任务使用真实 actor id 的 concurrency group，验证私有仓库、默认分支、run 的 actor / event / workflow / request id，只报告共享 Secret 是否存在后退出，不启动 Agent 或 Morty。`SHARED_AUTH_KEY` 存在不代表 `codex.enc` 已验证可用。
+
+Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${{ github.actor_id }}` concurrency group。浏览器创建本人 Issue 和临时公钥，runner 校验真实 run、actor、默认分支、run attempt、Issue 创建者与 request id 后，在隔离 home 中启动固定版本 `claude setup-token`。授权链接、授权码和结果 token 经 Issue 密文交换；浏览器收到 token 后单独点击共享，使用仓库公钥的 LibSodium sealed box 写 `SHARED_CLAUDE_TOKEN`。正常完成后关闭 Issue；关闭失败不改写授权结果。尚未接通聊天。
 
 当前实现涉及的状态与读写者：
 
 | 状态 / 文件 | 谁写 | 谁读 | 生命周期 |
 | --- | --- | --- | --- |
 | 浏览器内存中的 PAT、目标仓库、运行快照、操作结果 | 本人输入、launcher 的 GitHub API 响应 | 本页 launcher | 输入框连接时清空；不写 localStorage / IndexedDB；刷新页面后重新连接 |
-| workflow dispatch inputs：`mode=check`、随机 UUID `request_id` | launcher | GitHub、检查进程 | 不携带用户 id 或任何密钥；提交成功不等于任务已启动 |
-| Actions `GITHUB_EVENT_PATH` 指向的事件 JSON | GitHub | `src/runner/check.ts` | 本次 job 临时文件；校验 schema，再用 job token 核对真实 run |
-| job 环境中的 `GH_TOKEN` | GitHub 注入 job token | 检查进程的 GitHub HTTP client | 仅 contents / actions read，不传给其他子进程 |
+| workflow dispatch inputs：检查任务的 `mode=check` / `request_id`；登录任务的 `issue` / `request_id` | launcher | GitHub、对应运行进程 | 不携带凭据、授权码或私钥；提交成功不等于任务已启动 |
+| Actions `GITHUB_EVENT_PATH` 指向的事件 JSON | GitHub | 检查或登录入口 | 本次 job 临时文件；校验 schema，再用 job token 核对真实 run |
+| job 环境中的 `GH_TOKEN` | GitHub 注入 job token | 运行进程的 GitHub HTTP client | 检查任务 contents / actions read；登录任务另有 issues write。均不传给 Claude 子进程，不授予 Secrets 写入 |
 | `SHARED_CLAUDE_AVAILABLE` / `SHARED_CODEX_AVAILABLE` | workflow 根据 Secret 是否为空计算字符串布尔值 | 检查进程 | 只传存在标记，不传 Secret 内容；不进行登录或认证有效性验证 |
 | 检查 stdout 的 sanitized JSON / Actions 日志 | 检查进程 | 运行者通过 Actions 页面查看 | 含本人 id、request id、Secret 存在标记及 `chat=not_implemented`，不含凭据或聊天 |
+| 浏览器登录临时 RSA 私钥及未共享 Claude token | 本页生成私钥，解密 runner 的 token 消息 | 本页 launcher | 仅内存，私钥不可导出；共享完成、取消或页面销毁后放弃引用，不写浏览器持久存储 |
+| 本次 Issue 正文 | launcher | 登录进程 | 协议 v1、本人 id、request id、浏览器公钥、15 分钟 expiresAt；不含凭据 |
+| 本次 Issue comments | launcher 写授权码密文；job bot 写 challenge / token / error 密文 | 本次双方 | RSA-OAEP-SHA256 包装 AES-256-GCM key；AAD 绑定仓库、Issue、request、run、attempt、消息类型与期限。网页验证 bot 稳定 id，runner 验证真实用户 id；拒绝重复 code 和混合 attempt |
+| 登录目录 `$RUNNER_TEMP/shared-morty-claude-login-<随机后缀>/` | 运行进程创建，Claude 写自己的临时配置 | 仅本次登录子进程 | 同时作为 cwd / HOME / USERPROFILE / TMPDIR / TEMP，不载入个人聊天；子进程退出后运行进程递归删除。VM 强制销毁时依赖平台清理 |
+| PTY 和 xterm 内存屏幕 | 官方 Claude CLI 输出，运行进程读取 | 登录适配器 | `script` 日志目标为 `/dev/null`，stdout / stderr 不转发到 Actions 日志；等待授权码在屏幕回显后才发送 Enter；不按任意日志文本提取凭据 |
+| 仓库 Secret `SHARED_CLAUDE_TOKEN` | 本人 launcher 在显式点击共享后通过 PUT 写入或替换 | 后续 Claude 任务由 GitHub 注入 | 传输使用 GitHub 公钥 sealed box；只有 HTTP 201 / 204 成功才显示共享成功，权限或网络失败保留本页 token 供重试 |
 
-页面尚不读取检查结果，只显示运行状态和 GitHub 任务链接；失败和完成详情在 Actions 查看。停止使用普通 cancel API，不代表立即退出，也没有归档保证；必须刷新确认。以下完整登录、认证和归档流程仍是待实现设计。
+登录进程只传 PATH、临时 home 路径、终端类型、`BROWSER=false`、关闭更新与非必要流量的标记给 Claude；不传成员 PAT、job token、其他 Secrets 或个人密钥。90 秒内必须看到授权入口；整个交换期限从浏览器创建请求起算 15 分钟，包含排队。取消和超时会停止子进程，并有界尝试发送加密错误和关闭 Issue。取消 API 的成功仅表示请求被接收；页面仍需确认任务结束。请求或授权码发送结果不确定时保留本页上下文等待刷新，不自动重发。
+
+当前验证：真实 HTTP 替身、实际加密与 Secret 解密、外部进程替身；官方固定版本只检查了命令入口。尚未验证真实 Claude 账号授权、真实 Secrets 首次写入或浏览器 CSP。浏览器额外检查被工具自动审批拒绝，不能记为通过。此协议是新增 v1，尚无已发布的旧消息对端；原有检查 CLI 输出及保存格式未变。
+
+页面尚不读取环境检查的完整输出，详情在 Actions 查看；Claude 登录状态从加密 Issue 消息读取。以下 Codex 认证、聊天和归档流程仍是待实现设计，Claude 登录部分以本节的实际读写为准。
 
 ## 1. 范围与进程名称
 
