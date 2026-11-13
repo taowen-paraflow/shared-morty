@@ -105,6 +105,19 @@
         "csp": "Built launcher policy plus self connection only for the temporary local bootstrap endpoint."
     },
     "sharedSecretConsumer": {
-        "outcome": "pending"
+        "runId": 43359580808,
+        "sourceSha": "a39faef",
+        "outcome": "success",
+        "loggedIn": true,
+        "authMethod": "oauth_token",
+        "tokenCharacters": 108,
+        "modelTurnCreated": false,
+        "logPatternsDetected": {
+            "token": false,
+            "oauthUrl": false,
+            "oauthCode": false,
+            "pkceQuery": false
+        },
+        "limitation": "Official auth status verifies environment recognition, not an inference request or multi-user concurrency."
     }
 }
