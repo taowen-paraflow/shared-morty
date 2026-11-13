@@ -42,3 +42,6 @@ The real personal-chat browser runs are [43369263594](https://github.com/taowen-
 
 
 Refactor regressions invoke both public login/chat CLIs with unsupported events, extra arguments, and an unsafe Issue number to confirm rejection before provider execution. Chat boundary scenarios also confirm that late ready messages cannot revive a stopped task or conceal a prior error. These are boundary/integration checks, not tests of hooks or private reducers.
+
+
+Connection-guide scenarios render the full launcher, verify the default repository and GitHub template owner/permissions, change the target through visible controls, check the separate Secrets permission template, reject invalid repository templates, and connect against the stateful GitHub HTTP service with a cleared password field. They establish launcher behavior, not GitHub token issuance, organization approval, or new token persistence.

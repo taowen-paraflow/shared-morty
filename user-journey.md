@@ -23,7 +23,15 @@ metadata:
 
 管理员部署 launcher，给可信执行仓库启用 Actions 和 Issues，并授予成员需要的权限。执行仓库可以公开；凭据不得进入源码、公开日志或 Issue 明文。具有修改执行代码权限的人属于信任边界。
 
-用户填写执行仓库和 GitHub Token，点击“连接 GitHub”。页面向 GitHub 核实本人身份和目标仓库，连接区随后收起，显示本人及仓库。Token 只保留在本页内存；输入框立即清空，刷新后须重新输入。连接本身不会启动任务或读取 Secrets。
+页面首次展开三步连接引导：
+
+1. 确认已预填的执行仓库；团队成员通常无需修改，fork 部署时管理员应配置自己的默认仓库。
+2. 点击“在 GitHub 创建 Token”，新标签页预填资源所有者、90 天期限和 Actions / Issues 的 Read and write 权限。在 GitHub 的 Repository access 选择 Only select repositories，并勾选页面提示的仓库，再点击 Generate token。模板不能代替这一步仓库选择；期限可按组织策略调整。
+3. 复制 GitHub 刚生成的完整 Token，回到第 3 步粘贴并连接。已有 Token 可直接跳到输入框。
+
+只使用团队账号的人不需要 Secrets 权限。“我要共享自己的账号”展开后提供另一条额外申请 Secrets Read and write 的创建链接；它不启动 Claude 授权或自动共享账号。页面还提供资源所有者 / 仓库不可见、组织审批 Pending 和过期 Token 的排查提示。
+
+页面通过 GitHub API 确认本人和目标仓库，成功后连接区收起并显示身份与仓库。Token 输入框立即清空，仅本页内存中的 HTTP client 保留凭据；刷新后须重新连接，未新增浏览器持久保存。连接本身不会启动任务或读取 Secrets。
 
 一般使用者不需要 Secrets 写入权限。Claude 账号提供者需要 Actions / Issues 读写及仓库 Secrets 读写权限。这里的 GitHub 身份连接与模型账号授权是两件事，不要求每位成员进行 Claude / Codex OAuth。
 

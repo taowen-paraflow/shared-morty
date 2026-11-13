@@ -20,6 +20,7 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 | 状态 / 文件 | 谁写 | 谁读 | 生命周期 |
 | --- | --- | --- | --- |
 | 浏览器连接状态与 Session：PAT HTTP client、规范仓库名、GitHub 身份、连接代号 | `connection.ts` 的 `useConnection`；身份与仓库经 GitHub schema 校验 | 页面连接摘要；三个独立功能读取当前 Session | 内存；输入框立即清空。重连取消旧请求并卸载旧功能；连接代号只用于本地组件生命周期，不作为身份依据 |
+| 连接引导中的仓库名称及 Token 创建链接 | 部署者修改 `launcher/config.ts` 的 defaultRepository；本人在 `ConnectionForm` 修改仓库；`token-guide.ts` 规范化后派生链接 | 本人浏览器、GitHub 官方 Token 表单 | 只含公开仓库名、资源所有者、90 天期限及权限模板；默认 Actions / Issues write，共享模板另含 Secrets write。真实 Token 不写入链接或 React state；此预设不是执行授权依据 |
 | 当前入口：使用 / 共享 Claude / 共享 Codex | `view.tsx` 的 Workspace，由本人导航操作更新 | 导航与对应页面 | 默认使用入口；切换不提交 workflow、不发布凭据；重新连接重置 |
 | 使用页任务快照：loading / ready / stale / working / failed | `use-runner.ts`，只接收本人运行查询与操作结果；`usage-page.tsx` 协调显示 | 使用页及 `RunnerPanel` | 没有本页聊天任务时，进入或返回使用页重新查询；切换只隐藏以保留聊天密钥。stale 禁止凭旧快照启动检查 |
 | 浏览器个人聊天状态：idle / waiting / ready / stopping / stopped / failed，另有 working 包裹前态 | `use-chat.ts` 调用 `launcher/personal-chat.ts`；后者把经 schema、bot id、真实 run / attempt 核验并成功解密的消息归为单一结果联合，失败优先于停止、停止优先于就绪 | `ChatPanel`，不被共享账号页读取 | 仅内存；切换入口保留；重新连接、刷新或关闭后丢失。状态查询失败会撤下旧链接，保留本次密钥供重试 |
