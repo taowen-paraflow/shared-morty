@@ -49,6 +49,7 @@ export async function loginGitHubServer(
     }[] = [];
     const server = createServer(async (request, response) => {
         response.setHeader("content-type", "application/json");
+        response.setHeader("cache-control", "private, max-age=60");
         response.setHeader("access-control-allow-origin", "*");
         response.setHeader(
             "access-control-allow-headers",

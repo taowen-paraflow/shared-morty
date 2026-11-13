@@ -67,8 +67,13 @@ export class GitHubHttp {
         const timer = setTimeout(() => deadline.abort(), REQUEST_TIMEOUT_MS);
         const combined = AbortSignal.any([signal, deadline.signal]);
         try {
-            const response = await fetch(new URL(pathname, this.#origin), {
+            const url = new URL(pathname, this.#origin);
+            // GitHub serves mutable task/Issue data with max-age and shared-cache TTLs.
+            // A per-read nonce also bypasses intermediaries and fetch engines that ignore Request.cache.
+            if (method === "GET") url.searchParams.set("_shared_morty", crypto.randomUUID());
+            const response = await fetch(url, {
                 method,
+                cache: "no-store",
                 ...(body === undefined ? {} : { body: JSON.stringify(body) }),
                 headers: {
                     ...(body === undefined ? {} : { "content-type": "application/json" }),

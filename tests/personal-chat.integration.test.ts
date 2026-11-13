@@ -29,6 +29,11 @@ test.each(["ready", "agent_failure", "morty_failure", "unsafe_link"])(
         process.env.UNRELATED_SECRET = "must-not-reach-personal-agent";
         const diagnostics: Diagnostic[] = [];
         let finished: Promise<unknown> | undefined;
+        let tick: (() => void) | undefined;
+        let notifyWaiting: (() => void) | undefined;
+        const waiting = new Promise<void>((resolve) => {
+            notifyWaiting = resolve;
+        });
         try {
             fireEvent.input(getByLabelText(root, "执行仓库"), { target: { value: "team/execution" } });
             fireEvent.input(getByLabelText(root, "GitHub Token"), { target: { value: "fixture-token" } });
@@ -63,9 +68,14 @@ test.each(["ready", "agent_failure", "morty_failure", "unsafe_link"])(
                     clock: {
                         now: Date.now,
                         wait: (_milliseconds, signal) =>
-                            new Promise((_resolve, reject) => {
+                            new Promise<void>((resolve, reject) => {
                                 const abort = () => reject(new AppError("cancelled"));
+                                tick = () => {
+                                    signal.removeEventListener("abort", abort);
+                                    resolve();
+                                };
                                 signal.addEventListener("abort", abort, { once: true });
+                                notifyWaiting?.();
                             }),
                     },
                     diagnostic: (record) => diagnostics.push(record),
@@ -84,6 +94,7 @@ test.each(["ready", "agent_failure", "morty_failure", "unsafe_link"])(
                       });
             if (outcome === "ready") {
                 await github.waitForMessage("ready");
+                await waiting;
                 fireEvent.click(getByRole(root, "button", { name: "刷新聊天状态" }));
                 await visibleStatus(root, "个人 Claude 聊天已就绪");
                 const link = getByRole(root, "link", { name: "打开我的 Morty 聊天" }).getAttribute("href");
@@ -102,8 +113,9 @@ test.each(["ready", "agent_failure", "morty_failure", "unsafe_link"])(
                 fireEvent.click(getByRole(root, "button", { name: "停止我的聊天（不保存）" }));
                 await visibleStatus(root, "停止请求已提交");
                 expect(queryByRole(root, "link", { name: "打开我的 Morty 聊天" })).toBeNull();
-                lifetime.abort();
+                tick?.();
                 await finished;
+                github.finishRun();
                 if (!workspace) throw new Error("Missing workspace");
                 await expect(stat(workspace)).rejects.toMatchObject({ code: "ENOENT" });
                 fireEvent.click(getByRole(root, "button", { name: "刷新聊天状态" }));

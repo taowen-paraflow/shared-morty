@@ -3,12 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as v from "valibot";
 import { wait, withDeadline } from "../shared/async.ts";
-import { CHAT_LIFETIME_MS, type ChatHeader, chatContext } from "../shared/chat-protocol.ts";
+import { CHAT_LIFETIME_MS, type ChatHeader, chatContext, chatStopSchema } from "../shared/chat-protocol.ts";
 import { type DiagnosticSink, writeDiagnostic } from "../shared/diagnostics.ts";
 import { AppError, publicError } from "../shared/errors.ts";
 import type { GitHubClient } from "../shared/github.ts";
 import { seal } from "../shared/login-crypto.ts";
-import { tokenSchema } from "../shared/login-protocol.ts";
+import { parseJson, tokenSchema } from "../shared/login-protocol.ts";
 import type { LoginExecution } from "./claude-login.ts";
 import {
     type AgentPrograms,
@@ -96,7 +96,30 @@ export async function runPersonalChat(
             const ready = await connectPersonalMorty(environment, options.programs, session, chatSignal);
             await send("ready", ready, chatSignal);
             stage("ready");
-            await options.clock.wait(Math.max(0, request.expiresAt - options.clock.now()), chatSignal);
+            while (options.clock.now() < request.expiresAt) {
+                for (const comment of await channel.comments(input.issue, chatSignal)) {
+                    if (String(comment.user?.id) !== input.userId || comment.user?.type !== "User") continue;
+                    let raw: unknown;
+                    try {
+                        raw = parseJson(comment.body);
+                    } catch {
+                        continue;
+                    }
+                    const stop = v.safeParse(chatStopSchema, raw);
+                    if (
+                        stop.success &&
+                        stop.output.requestId === input.requestId &&
+                        stop.output.runId === input.runId &&
+                        stop.output.attempt === input.attempt &&
+                        stop.output.expiresAt === request.expiresAt
+                    )
+                        return;
+                }
+                await options.clock.wait(
+                    Math.min(30_000, request.expiresAt - options.clock.now()),
+                    chatSignal,
+                );
+            }
         });
     } catch (cause) {
         const error = publicError(cause);

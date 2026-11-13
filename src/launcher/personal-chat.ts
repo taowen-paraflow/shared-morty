@@ -173,6 +173,7 @@ export async function stopPersonalChat(
     client: GitHubClient,
     state: PersonalChat,
     signal: AbortSignal,
+    mode: "graceful" | "force" = "graceful",
 ): Promise<PersonalChat> {
     if (state.kind === "failed" || state.kind === "stopped") return state;
     const { context } = state;
@@ -182,7 +183,7 @@ export async function stopPersonalChat(
             ? { ...state, notice: "任务尚未出现，请稍后刷新并重试停止。" }
             : { kind: "stopped", notice: "当前没有运行中的个人任务。" };
     if (inspection.runner.kind !== "active") throw new AppError("runner_busy");
-    await client.verifyExecution(
+    const attempt = await client.verifyExecution(
         {
             repository: context.repository,
             runId: String(inspection.runner.run.id),
@@ -193,7 +194,22 @@ export async function stopPersonalChat(
         },
         signal,
     );
-    await client.cancelRunner(context.repository, inspection.runner.run.id, signal);
+    if (attempt === undefined) throw new AppError("unsafe_execution");
+    if (mode === "force") await client.cancelRunner(context.repository, inspection.runner.run.id, signal);
+    else
+        await client.chatChannel(context.repository).stop(
+            context.issue,
+            {
+                version: 1,
+                purpose: "claude_chat",
+                kind: "stop",
+                requestId: context.request.requestId,
+                runId: String(inspection.runner.run.id),
+                attempt,
+                expiresAt: context.request.expiresAt,
+            },
+            signal,
+        );
     return {
         kind: "stopping",
         context,

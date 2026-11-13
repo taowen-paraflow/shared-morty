@@ -115,7 +115,7 @@ export class GitHubClient {
             readonly attempt?: number;
         },
         signal: AbortSignal,
-    ): Promise<void> => {
+    ): Promise<number | undefined> => {
         if (!/^[1-9][0-9]*$/u.test(input.runId) || !/^[1-9][0-9]*$/u.test(input.userId))
             throw new AppError("unsafe_execution");
         const name = repositoryName(input.repository);
@@ -139,6 +139,7 @@ export class GitHubClient {
             run.output.display_title !== `shared-morty-${input.userId}-${input.requestId}`
         )
             throw new AppError("unsafe_execution");
+        return run.output.run_attempt;
     };
 
     readonly cancelRunner = async (repository: string, runId: number, signal: AbortSignal): Promise<void> => {

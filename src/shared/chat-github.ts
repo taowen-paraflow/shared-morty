@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { type ChatMessage, type ChatRequest, chatRequestSchema } from "./chat-protocol.ts";
+import { type ChatMessage, type ChatRequest, type ChatStop, chatRequestSchema } from "./chat-protocol.ts";
 import { AppError } from "./errors.ts";
 import type { GitHubHttp } from "./github-http.ts";
 import { githubRepositorySchema } from "./github-schema.ts";
@@ -52,6 +52,8 @@ export class ChatGitHub {
     };
     readonly comments = (issue: number, signal: AbortSignal) => this.#issues.comments(issue, signal);
     readonly send = (issue: number, message: ChatMessage, signal: AbortSignal) =>
+        this.#issues.send(issue, message, signal);
+    readonly stop = (issue: number, message: ChatStop, signal: AbortSignal) =>
         this.#issues.send(issue, message, signal);
     readonly close = (issue: number, signal: AbortSignal) => this.#issues.close(issue, signal);
 }

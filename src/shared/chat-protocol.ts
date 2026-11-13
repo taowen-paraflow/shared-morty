@@ -22,6 +22,16 @@ export type ChatMessage = Readonly<Omit<v.InferOutput<typeof chatMessageSchema>,
     readonly payload: Readonly<v.InferOutput<typeof sealedSchema>>;
 };
 export type ChatHeader = Omit<ChatMessage, "payload">;
+export const chatStopSchema = v.object({
+    version: v.literal(1),
+    purpose: v.literal("claude_chat"),
+    kind: v.literal("stop"),
+    requestId: chatMessageSchema.entries.requestId,
+    runId: chatMessageSchema.entries.runId,
+    attempt: chatMessageSchema.entries.attempt,
+    expiresAt: chatMessageSchema.entries.expiresAt,
+});
+export type ChatStop = Readonly<v.InferOutput<typeof chatStopSchema>>;
 export const chatReadySchema = v.object({
     url: v.pipe(v.string(), v.maxLength(8192)),
     accessExpiresAt: v.pipe(v.string(), v.isoTimestamp()),

@@ -46,6 +46,10 @@ export function useChat(session: Session, lifetime: AbortSignal) {
             if (screen.kind !== "idle")
                 execute((signal) => refreshPersonalChat(session.client, screen, signal));
         },
+        forceStop: () => {
+            if (screen.kind === "stopping")
+                execute((signal) => stopPersonalChat(session.client, screen, signal, "force"));
+        },
         stop: () => {
             if (screen.kind !== "idle") execute((signal) => stopPersonalChat(session.client, screen, signal));
         },

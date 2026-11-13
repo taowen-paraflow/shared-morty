@@ -50,6 +50,11 @@ export function ChatPanel({
                     <button type="button" disabled={busy || screen.kind === "stopping"} onClick={chat.stop}>
                         停止我的聊天（不保存）
                     </button>
+                    {screen.kind === "stopping" && (
+                        <button type="button" disabled={busy} onClick={chat.forceStop}>
+                            强制停止 runner（不保存）
+                        </button>
+                    )}
                     <p>
                         关闭网页不会停止 runner；刷新页面或更换连接会丢失未打开的入口，可在下方停止本人任务。
                     </p>
