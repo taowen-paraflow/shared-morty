@@ -32,6 +32,7 @@ export const githubRepositorySchema = v.object({
 });
 
 export const githubExecutionRunSchema = v.object({
+    run_attempt: v.optional(identifier),
     actor: v.object({ id: identifier }),
     event: v.string(),
     head_branch: v.string(),

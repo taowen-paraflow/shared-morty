@@ -20,6 +20,8 @@
         "ci:check": "corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build"
     },
     "dependencies": {
+        "@xterm/headless": "6.0.0",
+        "libsodium-wrappers": "0.8.4",
         "valibot": "1.5.0"
     },
     "devDependencies": {

@@ -43,10 +43,23 @@ export class GitHubHttp {
         signal: AbortSignal,
     ): Promise<unknown> => this.#request(pathname, signal, body);
 
+    readonly put = (
+        pathname: string,
+        body: Readonly<Record<string, unknown>>,
+        signal: AbortSignal,
+    ): Promise<unknown> => this.#request(pathname, signal, body, "PUT");
+
+    readonly patch = (
+        pathname: string,
+        body: Readonly<Record<string, unknown>>,
+        signal: AbortSignal,
+    ): Promise<unknown> => this.#request(pathname, signal, body, "PATCH");
+
     readonly #request = async (
         pathname: string,
         signal: AbortSignal,
         body?: Readonly<Record<string, unknown>>,
+        method = body === undefined ? "GET" : "POST",
     ): Promise<unknown> => {
         if (signal.aborted) throw new AppError("cancelled", signal.reason);
         const deadline = new AbortController();
@@ -54,7 +67,7 @@ export class GitHubHttp {
         const combined = AbortSignal.any([signal, deadline.signal]);
         try {
             const response = await fetch(new URL(pathname, this.#origin), {
-                method: body === undefined ? "GET" : "POST",
+                method,
                 ...(body === undefined ? {} : { body: JSON.stringify(body) }),
                 headers: {
                     ...(body === undefined ? {} : { "content-type": "application/json" }),
@@ -83,7 +96,11 @@ export class GitHubHttp {
                         throw new AppError("unavailable");
                 }
             }
-            if (response.status === 204 || response.status === 202) {
+            if (
+                response.status === 204 ||
+                response.status === 202 ||
+                (method === "PUT" && response.status === 201)
+            ) {
                 await response.body?.cancel();
                 return null;
             }

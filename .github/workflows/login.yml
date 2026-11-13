@@ -1,0 +1,39 @@
+name: Shared Morty Claude login
+run-name: shared-morty-${{ github.actor_id }}-${{ inputs.request_id }}
+
+on:
+    workflow_dispatch:
+        inputs:
+            request_id:
+                type: string
+                required: true
+            issue:
+                type: string
+                required: true
+
+permissions:
+    contents: read
+    actions: read
+    issues: write
+
+concurrency:
+    group: shared-morty-${{ github.actor_id }}
+    cancel-in-progress: false
+
+jobs:
+    login:
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        steps:
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+              with:
+                  node-version-file: .nvmrc
+            - run: corepack pnpm install --frozen-lockfile
+            - run: npm install --global @anthropic-ai/claude-code@2.1.323
+            - name: Authorize Claude without logging credentials
+              run: node src/runner/login.ts
+              env:
+                  GH_TOKEN: ${{ github.token }}

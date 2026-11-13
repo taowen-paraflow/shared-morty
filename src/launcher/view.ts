@@ -1,4 +1,5 @@
 import { assertNever } from "../shared/runner-status.ts";
+import type { ClaudeLoginState } from "./claude-login.ts";
 import type { ConnectionInput, LauncherAction, LauncherState } from "./state.ts";
 
 const runLabels: Readonly<Record<string, string>> = {
@@ -67,6 +68,10 @@ export function createLauncherView(
             case "failed":
                 text(state.error.message);
                 return;
+            case "claude_login":
+                text(`已连接 ${state.session.inspection.user.login}`);
+                renderLogin(state.login);
+                return;
             case "ready":
             case "needs_refresh": {
                 const session = state.session;
@@ -77,7 +82,10 @@ export function createLauncherView(
                 switch (runner.kind) {
                     case "idle":
                         text("当前没有运行中的 runner。");
-                        if (state.kind === "ready") button("检查运行环境", { kind: "check" });
+                        if (state.kind === "ready") {
+                            button("检查运行环境", { kind: "check" });
+                            button("登录并共享 Claude", { kind: "login_claude" });
+                        }
                         return;
                     case "active":
                         text(runLabels[runner.run.status] ?? "你的 runner 状态待确认，请查看 GitHub。");
@@ -97,6 +105,63 @@ export function createLauncherView(
             }
             default:
                 return assertNever(state);
+        }
+    };
+    const renderLogin = (login: ClaudeLoginState) => {
+        if (login.kind !== "shared" && login.notice) text(login.notice);
+        if (login.kind !== "shared" && login.kind !== "failed") button("取消登录", { kind: "login_cancel" });
+        switch (login.kind) {
+            case "waiting":
+                text("等待登录任务。稍后点击刷新登录状态，请保持本页打开。");
+                button("刷新登录状态", { kind: "login_refresh" });
+                return;
+            case "authorizing": {
+                text("在官方页面登录，完成后将授权码粘贴到这里。请保持本页打开。");
+                const anchor = document.createElement("a");
+                anchor.href = login.challenge.url;
+                anchor.textContent = "打开 Claude 官方授权页面";
+                anchor.target = "_blank";
+                anchor.rel = "noopener noreferrer";
+                status.append(anchor);
+                const codeForm = document.createElement("form");
+                const label = document.createElement("label");
+                label.textContent = "Claude 授权码";
+                const input = document.createElement("input");
+                input.type = "password";
+                input.autocomplete = "off";
+                input.required = true;
+                label.append(input);
+                const submit = document.createElement("button");
+                submit.type = "submit";
+                submit.textContent = "提交授权码";
+                codeForm.append(label, submit);
+                codeForm.addEventListener("submit", (event) => {
+                    event.preventDefault();
+                    const code = input.value;
+                    input.value = "";
+                    onAction({ kind: "login_code", code });
+                });
+                status.append(codeForm);
+                return;
+            }
+            case "waiting_token":
+                text("已发送授权码，等待 Claude 完成授权。");
+                button("刷新登录状态", { kind: "login_refresh" });
+                return;
+            case "authorized":
+                text("已登录，尚未共享。共享后，仓库运行成员可使用此 Claude 账号。");
+                text("共享将写入或替换此仓库已有的 Claude 凭据。");
+                button("共享到此仓库", { kind: "share_claude" });
+                return;
+            case "shared":
+                text("团队 Claude 已共享。");
+                button("返回环境", { kind: "login_back" });
+                return;
+            case "failed":
+                button("返回环境", { kind: "login_back" });
+                return;
+            default:
+                return assertNever(login);
         }
     };
     const submit = (event: SubmitEvent) => {

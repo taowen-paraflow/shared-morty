@@ -8,6 +8,7 @@ import {
     githubRunsSchema,
     githubUserSchema,
 } from "./github-schema.ts";
+import { LoginGitHub } from "./login-github.ts";
 import { type ActiveRun, type RunnerInspection, repositoryName, runnerState } from "./runner-status.ts";
 
 const MAX_PAGES = 10;
@@ -18,6 +19,9 @@ export class GitHubClient {
     constructor(token: string, origin?: string) {
         this.#http = new GitHubHttp(token, origin);
     }
+
+    readonly loginChannel = (repository: string): LoginGitHub =>
+        new LoginGitHub(this.#http, repositoryName(repository));
 
     readonly inspectRunner = async (repository: string, signal: AbortSignal): Promise<RunnerInspection> => {
         const name = repositoryName(repository);
@@ -83,6 +87,8 @@ export class GitHubClient {
             readonly userId: string;
             readonly ref: string;
             readonly requestId: string;
+            readonly workflow?: "runner" | "login";
+            readonly attempt?: number;
         },
         signal: AbortSignal,
     ): Promise<void> => {
@@ -104,7 +110,8 @@ export class GitHubClient {
             input.ref !== `refs/heads/${repository.output.default_branch}` ||
             run.output.head_branch !== repository.output.default_branch ||
             run.output.event !== "workflow_dispatch" ||
-            run.output.path.split("@")[0] !== ".github/workflows/runner.yml" ||
+            run.output.path.split("@")[0] !== `.github/workflows/${input.workflow ?? "runner"}.yml` ||
+            (input.attempt !== undefined && run.output.run_attempt !== input.attempt) ||
             String(run.output.actor.id) !== input.userId ||
             run.output.display_title !== `shared-morty-${input.userId}-${input.requestId}`
         )
