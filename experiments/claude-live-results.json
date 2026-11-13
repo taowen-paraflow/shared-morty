@@ -119,5 +119,26 @@
             "pkceQuery": false
         },
         "limitation": "Official auth status verifies environment recognition, not an inference request or multi-user concurrency."
+    },
+    "sharedSecretInference": {
+        "runId": 43366687430,
+        "sourceSha": "ec43166e44014501a1e5bffba91e65bb35df6f8b",
+        "outcome": "success",
+        "cliVersion": "2.1.323",
+        "modelSelection": "sonnet",
+        "loggedIn": true,
+        "authMethod": "oauth_token",
+        "modelTurnCreated": true,
+        "turns": 1,
+        "syntheticAnswerMatched": true,
+        "toolsEnabled": false,
+        "sessionPersistence": false,
+        "logPatternsDetected": {
+            "token": false,
+            "oauthUrl": false,
+            "oauthCode": false,
+            "pkceQuery": false
+        },
+        "limitation": "One synthetic model turn using the existing shared Secret in a fresh VM. Does not establish browser/Morty chat, tool execution, personal history isolation, other member permissions, or concurrent account use."
     }
 }
