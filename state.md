@@ -7,9 +7,11 @@ metadata:
 
 设计与实现状态，2026-11-13；Claude 登录和共享写入已实现，Codex 共享认证及个人归档尚未实现。本文按“谁持有状态、谁读、谁写、何时提交”组织。用户操作见 [user-journey.md](./user-journey.md)。
 
-当前已实现运行控制：launcher 查询本人任务、向默认分支的 `runner.yml` 提交环境检查、手动刷新、重新核验归属后请求停止本人任务。检查任务使用真实 actor id 的 concurrency group，验证私有仓库、默认分支、run 的 actor / event / workflow / request id，只报告共享 Secret 是否存在后退出，不启动 Agent 或 Morty。`SHARED_AUTH_KEY` 存在不代表 `codex.enc` 已验证可用。
+当前已实现运行控制：launcher 查询本人任务、向默认分支的 `runner.yml` 提交环境检查、手动刷新、重新核验归属后请求停止本人任务。检查任务使用真实 actor id 的 concurrency group，验证默认分支、run 的 actor / event / workflow / request id，只报告共享 Secret 是否存在后退出，不启动 Agent 或 Morty。`SHARED_AUTH_KEY` 存在不代表 `codex.enc` 已验证可用。
 
 Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${{ github.actor_id }}` concurrency group。浏览器创建本人 Issue 和临时公钥，runner 校验真实 run、actor、默认分支、run attempt、Issue 创建者与 request id 后，在隔离 home 中启动固定版本 `claude setup-token`。授权链接、授权码和结果 token 经 Issue 密文交换；浏览器收到 token 后单独点击共享，使用仓库公钥的 LibSodium sealed box 写 `SHARED_CLAUDE_TOKEN`。正常完成后关闭 Issue；关闭失败不改写授权结果。尚未接通聊天。
+
+公开性不是授权边界：只执行可信默认分支，核对 actor / workflow / run attempt。外部读者可读取 Issue 和日志，所以授权链接、授权码、token 仍须加密交换，Secret 不进源码，个人 cache 只含密文；具有发布执行代码权限的人仍属于既有信任边界。
 
 当前实现涉及的状态与读写者：
 
@@ -22,6 +24,7 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 | Actions `GITHUB_EVENT_PATH` 指向的事件 JSON | GitHub | 检查或登录入口 | 本次 job 临时文件；校验 schema，再用 job token 核对真实 run |
 | job 环境中的 `GH_TOKEN` | GitHub 注入 job token | 运行进程的 GitHub HTTP client | 检查任务 contents / actions read；登录任务另有 issues write。均不传给 Claude 子进程，不授予 Secrets 写入 |
 | `SHARED_CLAUDE_AVAILABLE` / `SHARED_CODEX_AVAILABLE` | workflow 根据 Secret 是否为空计算字符串布尔值 | 检查进程 | 只传存在标记，不传 Secret 内容；不进行登录或认证有效性验证 |
+| `SHARED_MORTY_DIAGNOSTICS=1` 的结构化诊断日志 | 登录进程 / HTTP client / PTY 适配器 | Actions 日志读者（公开仓库中包括任何人） | 仅固定事件、资源类别、状态码、长度、run / attempt / Issue id 与白名单提示标记；没有原始 URL、输入、终端文本或 token |
 | 检查 stdout 的 sanitized JSON / Actions 日志 | 检查进程 | 运行者通过 Actions 页面查看 | 含本人 id、request id、Secret 存在标记及 `chat=not_implemented`，不含凭据或聊天 |
 | 浏览器登录临时 RSA 私钥及未共享 Claude token | 本页生成私钥，解密 runner 的 token 消息 | 本页 launcher | 仅内存，私钥不可导出；共享完成、取消或页面销毁后放弃引用，不写浏览器持久存储 |
 | 本次 Issue 正文 | launcher | 登录进程 | 协议 v1、本人 id、request id、浏览器公钥、15 分钟 expiresAt；不含凭据 |
@@ -38,7 +41,7 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 
 ## 1. 范围与进程名称
 
-系统由静态 launcher、GitHub Actions 和 Morty 组成。真实凭据和执行 workflow 放在可信私有执行仓库；公开 shared-morty 仓库保留源码。不增加业务数据库、常驻后台服务、额外认证 runner、下载或导出功能。
+系统由静态 launcher、GitHub Actions 和 Morty 组成。源码与执行 workflow 可以放在同一个公开仓库。共享凭据放 GitHub Secrets 或加密文件；个人数据仅存密文；公开日志、Issue 和 cache 不得携带明文秘密。不增加业务数据库、常驻后台服务、额外认证 runner、下载或导出功能。
 
 账号提供者授权一次，团队成员直接使用。每人一个 runner 前缀，同一用户最多一个运行中的 runner，不同用户可以并行；个人历史、文件、Morty 身份和历史密钥彼此独立。
 
@@ -62,7 +65,7 @@ Claude 登录使用独立 `login.yml`，与 `runner.yml` 共用 `shared-morty-${
 | --- | --- | --- | --- | --- |
 | 共享 Claude CI token | GitHub Secret `SHARED_CLAUDE_TOKEN` | 账号提供者的 launcher，通过 Secrets API | GitHub 注入给 Claude 聊天步骤 | 首次共享、重新授权 |
 | 共享 Codex 认证加密 key | GitHub Secret `SHARED_AUTH_KEY` | 账号提供者的 launcher | GitHub 注入给认证模块 | 首次设置；常规刷新不换 key |
-| **共享 Codex 当前完整认证** | **私有执行仓库 `auth-state` 分支中的 `codex.enc`** | **持账号锁的认证模块，通过 Contents API** | **认证模块** | **首次共享、刷新提交、重新授权、停用** |
+| **共享 Codex 当前完整认证** | **执行仓库 `auth-state` 分支中的 `codex.enc`** | **持账号锁的认证模块，通过 Contents API** | **认证模块** | **首次共享、刷新提交、重新授权、停用** |
 | Codex 刷新中的本地认证 | `T/auth-refresh/<operationId>/codex/auth.json` | 认证模块写输入；managed-auth 进程写更新 | managed-auth 进程；随后由认证模块读取 | 仅一次登录 / 刷新操作期间 |
 | 聊天使用的 Codex access token | 个人 app-server 内存 | adapter 通过官方协议交付 | 个人 app-server | 启动、更新认证回调 |
 | 个人历史密钥 `historyKey` | 本人 launcher 的 IndexedDB vault | 本人 launcher | 本人 launcher；本次授权的归档模块 | 首次使用生成，浏览器清理后丢失 |
@@ -277,7 +280,7 @@ Claude 停用由提供者的 launcher 删除 token Secret。Codex 停用先通�
 
 ## 9. 真实 GitHub Actions 实验记录
 
-2026-11-13，在当前公开仓库 `taowen-paraflow/shared-morty` 的独立分支 `codex/workflow-state-experiments` 执行，未改动默认分支、真实凭据或 GitHub 设置。实验只使用合成 token / key；真实凭据的执行环境仍按前文使用私有仓库。
+2026-11-13，在当前公开仓库 `taowen-paraflow/shared-morty` 的独立分支 `codex/workflow-state-experiments` 执行，未改动默认分支、真实凭据或 GitHub 设置。实验只使用合成 token / key；该批实验未使用真实凭据；后续正式设计允许公开仓库执行，依赖 Secrets、加密和可信默认分支。
 
 最终版本 `1ce41065fd94c8bdec8dff1b7e70f4d47f0b877d` 的 [完整运行](https://github.com/taowen-paraflow/shared-morty/actions/runs/43332500847) **17 个 job 全部成功**。其中 `crash-after-intent` 内部故意让测试进程退出 23，workflow 检查该失败确实发生，再继续验证恢复；该预期失败没有被当作普通成功忽略。
 

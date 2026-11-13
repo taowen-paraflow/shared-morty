@@ -7,7 +7,7 @@ metadata:
 
 Share Claude Code and Codex with your team while keeping personal conversations and execution environments separate.
 
-The static launcher connects to GitHub, inspects the authenticated user's runners, dispatches an execution-environment check, refreshes status, and requests cancellation of owned tasks. The CLI also exposes status inspection. The check workflow verifies private-repository/default-branch execution and reports shared-secret presence; it does not start a chat. Owners can now start a private Actions login task, complete Claude authorization through encrypted Issue messages, and publish the resulting CI token as a repository Secret. Morty/chat integration, Codex login/refresh, and encrypted personal history remain unimplemented. Real-account authorization and browser CSP compatibility are not yet validated.
+The static launcher connects to GitHub, inspects the authenticated user's runners, dispatches an execution-environment check, refreshes status, and requests cancellation of owned tasks. The CLI also exposes status inspection. The check workflow verifies default-branch and authenticated-actor execution and reports shared-secret presence; it does not start a chat. Owners can now start an Actions login task in a public or private repository, complete Claude authorization through encrypted Issue messages, and publish the resulting CI token as a repository Secret. Morty/chat integration, Codex login/refresh, and encrypted personal history remain unimplemented. Real-account authorization and browser CSP compatibility are not yet validated.
 
 Start with [Contributing](docs/CONTRIBUTING.md) for local commands, [Testing](docs/TESTING.md) for acceptance boundaries, and [Engineering rules](AGENTS.md) before making changes.
 

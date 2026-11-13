@@ -23,3 +23,5 @@ Claude sharing tests use a stateful GitHub HTTP service with actual RSA-OAEP/AES
 Launcher regression scenarios also cover focus after malformed authorization-code submission, duplicate clicks creating only one task, and reconnecting while a previous HTTP response is held. They enter through the complete React launcher and visible controls, without testing reducers or hooks in isolation. DOM observers await settled accessible status; they do not poll or sleep.
 
 Tests own and close their servers, DOM views, and child processes. They do not use real sleeps, fetch interception, or mocked application modules. Product changes must first demonstrate a failing Given-When-Then acceptance scenario.
+
+Public-repository acceptance now exercises the same encrypted login/sharing path instead of rejecting repository visibility. Worker diagnostic records and real CLI stderr are checked for secret disclosure. Manual runner observations must be recorded separately from fixture expectations; a fake transcript is evidence only after it matches the observed pinned CLI behavior.
