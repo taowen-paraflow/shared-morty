@@ -12,6 +12,7 @@ import {
     loginRequestSchema,
     parseJson,
 } from "../../src/shared/login-protocol.ts";
+import { authorizationUrl } from "../fixtures/claude-transcript.ts";
 
 async function body(request: IncomingMessage): Promise<unknown> {
     request.setEncoding("utf8");
@@ -28,7 +29,6 @@ export async function loginGitHubServer(options: { readonly private?: boolean } 
     await sodium.ready;
     const secretKey = sodium.crypto_box_keypair();
     const runnerKey = await createLoginKey();
-    const authorizationUrl = "https://claude.com/oauth/authorize?state=fixture-sensitive-state";
     const authorizationCode = "fixture-good-code#fixture-state";
     const token = `sk-ant-oat01-${"fixture-token-".repeat(4)}`;
     let requestBody = "";

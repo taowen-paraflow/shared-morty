@@ -60,7 +60,7 @@ export type Diagnostic =
           readonly kind: "authorization_code" | "enter";
           readonly characters: number;
       }
-    | { readonly event: "terminal.input_echo"; readonly matched: true }
+    | { readonly event: "terminal.input_echo"; readonly matched: true; readonly mode: "plain" | "masked" }
     | {
           readonly event: "terminal.outcome";
           readonly kind: "token" | "provider_error";

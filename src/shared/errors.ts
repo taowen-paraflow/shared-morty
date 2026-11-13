@@ -28,7 +28,7 @@ const messages: Readonly<Record<ErrorCode, string>> = {
     too_many_runs: "运行记录超出本次可验证范围，无法可靠确认当前环境。",
     unavailable: "暂时无法连接 GitHub，请重试。",
     cancelled: "请求已取消。",
-    timeout: "连接 GitHub 超时，请重试。",
+    timeout: "等待操作完成超时，请重试。",
 };
 
 export class AppError extends Error {

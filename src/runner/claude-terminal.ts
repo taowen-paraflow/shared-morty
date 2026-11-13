@@ -158,10 +158,16 @@ export class ClaudeTerminal {
         if (signal.aborted) throw new AppError("cancelled", signal.reason);
         this.#diagnostic({ event: "terminal.input", kind: "authorization_code", characters: code.length });
         this.#child.stdin.write(code);
-        await withDeadline(10_000, signal, (inputSignal) =>
-            this.#find((text) => (text.replaceAll("\n", "").includes(code) ? true : undefined), inputSignal),
+        const masked = `${"*".repeat(code.length - 6)}${code.slice(-6)}`;
+        const mode = await withDeadline(10_000, signal, (inputSignal) =>
+            this.#find<"plain" | "masked">((text) => {
+                const joined = text.replaceAll("\n", "");
+                if (joined.includes(code)) return "plain";
+                if (joined.includes(masked)) return "masked";
+                return undefined;
+            }, inputSignal),
         );
-        this.#diagnostic({ event: "terminal.input_echo", matched: true });
+        this.#diagnostic({ event: "terminal.input_echo", matched: true, mode });
         this.#diagnostic({ event: "terminal.input", kind: "enter", characters: 1 });
         this.#child.stdin.write("\r");
         return this.#find((text) => {

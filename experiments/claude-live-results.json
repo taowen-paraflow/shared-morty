@@ -1,0 +1,53 @@
+{
+    "date": "2026-11-13",
+    "repository": "taowen-paraflow/shared-morty",
+    "visibility": "public",
+    "cliVersion": "2.1.323",
+    "firstAuthorization": {
+        "runId": 43356819899,
+        "sourceSha": "1526b55",
+        "issue": 1,
+        "outcome": "failed_before_enter",
+        "observations": [
+            "GitHub execution and Issue ownership verification succeeded on the public repository.",
+            "The real browser decrypted the challenge from github-actions[bot].",
+            "The owner submitted a 92-character authorization code through an encrypted Issue comment.",
+            "The worker matched exactly one code from the authenticated owner.",
+            "The terminal rendered new output but full plaintext code echo was absent.",
+            "The obsolete echo condition timed out after 10 seconds; no Enter or token publication occurred.",
+            "The encrypted error reached the browser; cleanup closed the Issue."
+        ]
+    },
+    "syntheticInputProbe": {
+        "runId": 43357758141,
+        "sourceSha": "9b19f4e",
+        "outcome": "success",
+        "accountAuthorized": false,
+        "enterSent": false,
+        "columns": 1000,
+        "rows": 80,
+        "inputCharacters": 92,
+        "beforeScreenCharacters": 1406,
+        "afterScreenCharacters": 1499,
+        "exactEcho": false,
+        "joinedEcho": false,
+        "maskCharacters": 86,
+        "visibleSuffixCharacters": 6,
+        "prompt": "Paste code here if prompted > ",
+        "authorizationOrigin": "https://claude.com",
+        "authorizationPath": "/cai/oauth/authorize",
+        "queryKeys": ["client_id", "code", "code_challenge", "code_challenge_method", "redirect_uri", "response_type", "scope", "state"]
+    },
+    "regression": {
+        "fixtureChange": "Use the observed prompt, synthetic OAuth parameter structure, and stars plus the final six input characters.",
+        "beforeFix": "The updated external-process fixture failed authorization scenarios against the old full-echo condition.",
+        "afterFix": "The existing worker acceptance scenarios pass and record masked echo mode without logging its suffix."
+    },
+    "retryAuthorization": {
+        "outcome": "pending"
+    },
+    "limitations": [
+        "No real model turn, history encryption, or Codex sharing is tested here.",
+        "The synthetic provider failure and token-success fixture branches remain provisional until compared with subsequent live observations."
+    ]
+}

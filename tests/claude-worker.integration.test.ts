@@ -101,6 +101,8 @@ test.each(["authorized", "invalid_code", "replayed_code", "cancelled"])(
             const log = JSON.stringify(diagnostics);
             expect(log).toContain('"event":"terminal.output"');
             expect(log).toContain('"event":"terminal.exit"');
+            if (outcome === "authorized" || outcome === "invalid_code")
+                expect(log).toContain('"mode":"masked"');
             expect(log).not.toContain(github.token);
             expect(log).not.toContain(github.authorizationCode);
             expect(log).not.toContain(github.authorizationUrl);

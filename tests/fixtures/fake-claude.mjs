@@ -3,9 +3,8 @@ if (process.env.GH_TOKEN || process.env.UNRELATED_SECRET || process.env.CLAUDE_C
     process.stderr.write("OAuth error: unexpected inherited credentials\n");
     process.exit(1);
 }
-process.stdout.write(
-    "\u001b[2J\u001b[Hhttps://claude.com/oauth/authorize?state=fixture-sensitive-state\r\nPaste code here:\r\n",
-);
+process.stdout.write("\u001b[2J\u001b[HWelcome to Claude Code v2.1.323\r\n");
+setImmediate(() => process.stdout.write(authorizationPrompt));
 process.stdin.setEncoding("utf8");
 if (process.stdin.isTTY) process.stdin.setRawMode(true);
 let input = "";
@@ -17,7 +16,9 @@ process.stdin.on("data", (chunk) => {
     }
     input += chunk;
     if (!/[\r\n]/u.test(input)) {
-        process.stdout.write(input);
+        process.stdout.write(
+            `\r\u001b[2KPaste code here if prompted > ${"*".repeat(Math.max(0, input.length - 6))}${input.slice(-6)}`,
+        );
         return;
     }
     process.stdout.write("\r\n");
@@ -31,3 +32,5 @@ process.stdin.on("data", (chunk) => {
     }
     process.stdin.pause();
 });
+
+import { authorizationPrompt } from "./claude-transcript.ts";
