@@ -5,8 +5,15 @@ import { assertNever, type RunnerInspection } from "../shared/runner-status.ts";
 type LauncherState =
     | { readonly kind: "disconnected" }
     | { readonly kind: "connecting"; readonly request: AbortController }
-    | { readonly kind: "connected"; readonly inspection: RunnerInspection }
+    | { readonly kind: "connected"; readonly session: Session; readonly message: string }
+    | { readonly kind: "working"; readonly request: AbortController }
     | { readonly kind: "failed"; readonly error: AppError };
+
+interface Session {
+    readonly client: GitHubClient;
+    readonly repository: string;
+    readonly inspection: RunnerInspection;
+}
 
 interface LauncherOptions {
     readonly apiOrigin?: string;
@@ -53,6 +60,47 @@ export function mountLauncher(root: HTMLElement, options: LauncherOptions = {}):
         anchor.rel = "noopener noreferrer";
         status.append(anchor);
     };
+    const button = (label: string, action: () => Promise<void>) => {
+        const control = document.createElement("button");
+        control.type = "button";
+        control.textContent = label;
+        control.addEventListener("click", () => {
+            void action();
+        });
+        status.append(control);
+    };
+    const operate = async (session: Session, action: "refresh" | "check" | number) => {
+        if (state.kind !== "connected") return;
+        const request = new AbortController();
+        const signal = AbortSignal.any([lifetime.signal, request.signal]);
+        transition({ kind: "working", request });
+        try {
+            if (action === "refresh") {
+                const inspection = await session.client.inspectRunner(session.repository, signal);
+                if (!signal.aborted)
+                    transition({ kind: "connected", session: { ...session, inspection }, message: "" });
+            } else {
+                if (action === "check") await session.client.checkEnvironment(session.repository, signal);
+                else await session.client.cancelRunner(session.repository, action, signal);
+                if (!signal.aborted)
+                    transition({
+                        kind: "connected",
+                        session,
+                        message:
+                            action === "check"
+                                ? "检查任务已提交，请刷新状态。检查通过不表示聊天已可用。"
+                                : "停止请求已提交，请刷新状态。尚未确认结束，未保存个人数据。",
+                    });
+            }
+        } catch (cause) {
+            if (!signal.aborted)
+                transition({
+                    kind: "connected",
+                    session,
+                    message: `${publicError(cause).message} 如已提交任务，请先刷新状态再重试。`,
+                });
+        }
+    };
     const render = () => {
         status.replaceChildren();
         switch (state.kind) {
@@ -62,23 +110,34 @@ export function mountLauncher(root: HTMLElement, options: LauncherOptions = {}):
             case "connecting":
                 text("正在确认身份与运行状态…");
                 return;
+            case "working":
+                text("正在处理，请稍候…");
+                return;
             case "failed":
                 text(state.error.message);
                 return;
             case "connected": {
-                text(`已连接 ${state.inspection.user.login}`);
-                const runner = state.inspection.runner;
+                const session = state.session;
+                text(`已连接 ${session.inspection.user.login}`);
+                if (state.message) text(state.message);
+                button("刷新状态", () => operate(session, "refresh"));
+                const runner = session.inspection.runner;
                 switch (runner.kind) {
                     case "idle":
                         text("当前没有运行中的 runner。");
+                        if (!state.message) button("检查运行环境", () => operate(session, "check"));
                         return;
                     case "active":
                         text(runLabels[runner.run.status] ?? "你的 runner 状态待确认，请查看 GitHub。");
                         link(runner.run.url);
+                        button("强制停止（不保存）", () => operate(session, runner.run.id));
                         return;
                     case "conflict":
                         text("发现多个尚未结束的任务，请先在 GitHub 确认并处理重复启动。");
-                        for (const run of runner.runs) link(run.url);
+                        for (const run of runner.runs) {
+                            link(run.url);
+                            button(`强制停止任务 ${run.id}（不保存）`, () => operate(session, run.id));
+                        }
                         return;
                     default:
                         return assertNever(runner);
@@ -93,7 +152,7 @@ export function mountLauncher(root: HTMLElement, options: LauncherOptions = {}):
         render();
     };
     const connect = async () => {
-        if (state.kind === "connecting") state.request.abort();
+        if (state.kind === "connecting" || state.kind === "working") state.request.abort();
         const request = new AbortController();
         const secret = token.value;
         const selectedRepository = repository.value;
@@ -103,7 +162,12 @@ export function mountLauncher(root: HTMLElement, options: LauncherOptions = {}):
         try {
             const client = new GitHubClient(secret, options.apiOrigin);
             const inspection = await client.inspectRunner(selectedRepository, signal);
-            if (!signal.aborted) transition({ kind: "connected", inspection });
+            if (!signal.aborted)
+                transition({
+                    kind: "connected",
+                    session: { client, repository: selectedRepository, inspection },
+                    message: "",
+                });
         } catch (cause) {
             if (!signal.aborted) transition({ kind: "failed", error: publicError(cause) });
         }

@@ -2,6 +2,42 @@ import { expect, test, vi } from "vitest";
 import { GitHubClient } from "../src/shared/github.ts";
 import { githubServer } from "./support/github-server.ts";
 
+test("Given another user's runner, when Alice tries to cancel it, then it remains running", async () => {
+    const github = await githubServer();
+    github.setRuns([{ id: 99, actorId: 99, name: "shared-morty-42-forged", status: "in_progress" }]);
+    const client = new GitHubClient("fixture-token", github.origin);
+    const signal = new AbortController().signal;
+    try {
+        await expect(client.cancelRunner("team/execution", 99, signal)).rejects.toMatchObject({
+            code: "forbidden",
+        });
+        const response = await fetch(`${github.origin}/repos/team/execution/actions/runs`, {
+            headers: { authorization: "Bearer fixture-token" },
+        });
+        expect(await response.json()).toMatchObject({ workflow_runs: [{ id: 99, status: "in_progress" }] });
+    } finally {
+        await github.close();
+    }
+});
+
+test("Given Alice already has a runner, when she requests an environment check, then no second task is created", async () => {
+    const github = await githubServer();
+    github.setRuns([{ id: 1, actorId: 42, name: "shared-morty-42-existing", status: "in_progress" }]);
+    const client = new GitHubClient("fixture-token", github.origin);
+    const signal = new AbortController().signal;
+    try {
+        await expect(client.checkEnvironment("team/execution", signal)).rejects.toMatchObject({
+            code: "runner_busy",
+        });
+        expect((await client.inspectRunner("team/execution", signal)).runner).toMatchObject({
+            kind: "active",
+            run: { id: 1 },
+        });
+    } finally {
+        await github.close();
+    }
+});
+
 test("Given a runner on a later page, when GitHub is inspected, then pending work is not mistaken for idle", async () => {
     const github = await githubServer();
     github.setRuns([

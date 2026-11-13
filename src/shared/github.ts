@@ -85,14 +85,92 @@ export class GitHubClient {
         throw new AppError("too_many_runs");
     };
 
-    readonly #get = async (pathname: string, signal: AbortSignal): Promise<unknown> => {
+    readonly checkEnvironment = async (repository: string, signal: AbortSignal): Promise<void> => {
+        const name = repositoryName(repository);
+        const inspection = await this.inspectRunner(name, signal);
+        if (inspection.runner.kind !== "idle") throw new AppError("runner_busy");
+        const parsed = v.safeParse(
+            v.object({ default_branch: v.pipe(v.string(), v.minLength(1), v.maxLength(255)) }),
+            await this.#get(`/repos/${name}`, signal),
+        );
+        if (!parsed.success) throw new AppError("invalid_response");
+        await this.#request(`/repos/${name}/actions/workflows/runner.yml/dispatches`, signal, {
+            ref: parsed.output.default_branch,
+            inputs: { request_id: crypto.randomUUID(), mode: "check" },
+        });
+    };
+
+    readonly verifyExecution = async (
+        input: {
+            readonly repository: string;
+            readonly runId: string;
+            readonly userId: string;
+            readonly ref: string;
+            readonly requestId: string;
+        },
+        signal: AbortSignal,
+    ): Promise<void> => {
+        if (!/^[1-9][0-9]*$/u.test(input.runId) || !/^[1-9][0-9]*$/u.test(input.userId))
+            throw new AppError("unsafe_execution");
+        const name = repositoryName(input.repository);
+        const repository = v.safeParse(
+            v.object({ private: v.boolean(), full_name: v.string(), default_branch: v.string() }),
+            await this.#get(`/repos/${name}`, signal),
+        );
+        const run = v.safeParse(
+            v.object({
+                actor: v.object({
+                    id: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(Number.MAX_SAFE_INTEGER)),
+                }),
+                event: v.string(),
+                head_branch: v.string(),
+                path: v.string(),
+                display_title: v.string(),
+            }),
+            await this.#get(`/repos/${name}/actions/runs/${input.runId}`, signal),
+        );
+        if (!repository.success || !run.success) throw new AppError("invalid_response");
+        if (
+            !repository.output.private ||
+            repository.output.full_name.toLowerCase() !== name ||
+            input.ref !== `refs/heads/${repository.output.default_branch}` ||
+            run.output.head_branch !== repository.output.default_branch ||
+            run.output.event !== "workflow_dispatch" ||
+            run.output.path.split("@")[0] !== ".github/workflows/runner.yml" ||
+            String(run.output.actor.id) !== input.userId ||
+            run.output.display_title !== `shared-morty-${input.userId}-${input.requestId}`
+        )
+            throw new AppError("unsafe_execution");
+    };
+
+    readonly cancelRunner = async (repository: string, runId: number, signal: AbortSignal): Promise<void> => {
+        if (!Number.isSafeInteger(runId) || runId < 1) throw new AppError("invalid_input");
+        const name = repositoryName(repository);
+        const inspection = await this.inspectRunner(name, signal);
+        const runner = inspection.runner;
+        const owned = runner.kind === "active" ? [runner.run] : runner.kind === "conflict" ? runner.runs : [];
+        if (!owned.some((run) => run.id === runId)) throw new AppError("forbidden");
+        await this.#request(`/repos/${name}/actions/runs/${runId}/cancel`, signal, {});
+    };
+
+    readonly #get = async (pathname: string, signal: AbortSignal): Promise<unknown> =>
+        this.#request(pathname, signal);
+
+    readonly #request = async (
+        pathname: string,
+        signal: AbortSignal,
+        body?: Readonly<Record<string, unknown>>,
+    ): Promise<unknown> => {
         if (signal.aborted) throw new AppError("cancelled", signal.reason);
         const deadline = new AbortController();
         const timer = setTimeout(() => deadline.abort(), REQUEST_TIMEOUT_MS);
         const combined = AbortSignal.any([signal, deadline.signal]);
         try {
             const response = await fetch(new URL(pathname, this.#origin), {
+                method: body === undefined ? "GET" : "POST",
+                ...(body === undefined ? {} : { body: JSON.stringify(body) }),
                 headers: {
+                    ...(body === undefined ? {} : { "content-type": "application/json" }),
                     accept: "application/vnd.github+json",
                     authorization: `Bearer ${this.#token}`,
                     "x-github-api-version": "2022-11-28",
@@ -111,14 +189,21 @@ export class GitHubClient {
                         throw new AppError("repository_unavailable");
                     case 429:
                         throw new AppError("rate_limited");
+                    case 409:
+                    case 422:
+                        throw new AppError("conflict");
                     default:
                         throw new AppError("unavailable");
                 }
             }
-            const body = await response.text();
-            if (body.length > 2_000_000) throw new AppError("invalid_response");
+            if (response.status === 204 || response.status === 202) {
+                await response.body?.cancel();
+                return null;
+            }
+            const text = await response.text();
+            if (text.length > 2_000_000) throw new AppError("invalid_response");
             try {
-                const value: unknown = JSON.parse(body);
+                const value: unknown = JSON.parse(text);
                 return value;
             } catch (cause) {
                 throw new AppError("invalid_response", cause);

@@ -1,0 +1,40 @@
+name: Shared Morty runner
+run-name: shared-morty-${{ github.actor_id }}-${{ inputs.request_id }}
+
+on:
+    workflow_dispatch:
+        inputs:
+            mode:
+                type: choice
+                options: [check]
+                required: true
+            request_id:
+                type: string
+                required: true
+
+permissions:
+    contents: read
+    actions: read
+
+concurrency:
+    group: shared-morty-${{ github.actor_id }}
+    cancel-in-progress: false
+
+jobs:
+    check:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+              with:
+                  node-version-file: .nvmrc
+            - run: corepack pnpm install --frozen-lockfile
+            - name: Verify execution environment
+              run: node src/runner/check.ts
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  SHARED_CLAUDE_AVAILABLE: ${{ secrets.SHARED_CLAUDE_TOKEN != '' }}
+                  SHARED_CODEX_AVAILABLE: ${{ secrets.SHARED_AUTH_KEY != '' }}
